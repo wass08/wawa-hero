@@ -1,5 +1,7 @@
 {
  "version": 1,
+ "energy": 3,
+ "_energy": "hardest song (user ranking)",
  "_doc": "Hand-authored pins (one chart per song: each pin's \"notes\" list) for system-online. Times are seconds in audio.mp3, snapped to the detected half-beat grid (126 BPM, first downbeat 0.284 s). Vocal command times were found by faster-whisper word timestamps + MMS forced alignment on a demucs vocal stem; see tools/chart/README.md.",
  "analysis": {"bpm": 126.0, "offset": 0.284},
  "preview": {"start": 51.713, "bars": 8, "why": "chorus 1 from its downbeat ('Arms. Up.'), 8 bars = commands + Overload"},

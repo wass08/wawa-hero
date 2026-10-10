@@ -47,14 +47,43 @@ def end(n):
     return n["t"] + (n.get("dur", 0.0) if n["move"] == "sweep" else 0.0)
 
 
-def min_gap(a: dict, b: dict, P: float, density: str) -> float:
+def beat_pos(c: dict, t: float) -> float:
+    """fractional beat index of time t on the chart's beat grid (tempo may drift); linear outside"""
+    bs = c.get("beats") or []
+    if len(bs) < 2:
+        return (t - c.get("offset", 0.0)) * c["bpm"] / 60.0
+    if t <= bs[0]:
+        return (t - bs[0]) / (bs[1] - bs[0])
+    if t >= bs[-1]:
+        return len(bs) - 1 + (t - bs[-1]) / (bs[-1] - bs[-2])
+    lo, hi = 0, len(bs) - 1
+    while hi - lo > 1:
+        mid = (lo + hi) // 2
+        lo, hi = (mid, hi) if bs[mid] <= t else (lo, mid)
+    return lo + (t - bs[lo]) / (bs[hi] - bs[lo])
+
+
+def beats_between(c: dict, t0: float, t1: float) -> float:
+    return beat_pos(c, t1) - beat_pos(c, t0)
+
+
+def local_beat(c: dict, t: float) -> float:
+    """seconds per beat around t"""
+    return 1.0 / max(1e-6, beats_between(c, t - 0.25, t + 0.25)) * 0.5
+
+
+BTOL = 0.05                            # beats of tolerance for grid-based rules
+
+
+def min_gap(a: dict, b: dict, c: dict, density: str) -> float:
     if density != "easy" and a["move"] == "clap" and b["move"] == "clap":
-        return CLAP_PAIR_BEATS * P
+        return CLAP_PAIR_BEATS * local_beat(c, b["t"])
     return EASY_MIN_GAP if density == "easy" else MIN_GAP
 
 
 def validate_chart(song: dict, c: dict, density: str = "normal") -> list[str]:
-    """density: the generator's note-density rules the chart was built with (the game ships "normal")."""
+    """density: the generator's note-density rules the chart was built with (the game ships "normal").
+    Beat-based rules use the chart's own beat grid, so they hold on songs whose tempo drifts."""
     errs = []
     e = errs.append
     if c.get("version") != 1:
@@ -65,7 +94,6 @@ def validate_chart(song: dict, c: dict, density: str = "normal") -> list[str]:
     if not (40 <= bpm <= 250):
         e(f"bad bpm {bpm}")
         return errs
-    P = 60.0 / bpm
     dur = song["duration"]
     off = c.get("offset", -1)
     if not (0 <= off < dur):
@@ -92,8 +120,10 @@ def validate_chart(song: dict, c: dict, density: str = "normal") -> list[str]:
             d = n.get("dur")
             if d is None:
                 e(f"{tag}: sweep without dur")
-            elif not (SWEEP_BEATS[0] * P - TOL <= d <= SWEEP_BEATS[1] * P + TOL):
-                e(f"{tag}: sweep dur {d:.3f}s not in 2-4 beats")
+            else:
+                nb = beats_between(c, n["t"], n["t"] + d)
+                if not (SWEEP_BEATS[0] - BTOL <= nb <= SWEEP_BEATS[1] + BTOL):
+                    e(f"{tag}: sweep lasts {nb:.2f} beats, not 2-4")
         elif "dur" in n:
             e(f"{tag}: tap note with dur")
         if density == "easy" and n["move"] not in EASY_MOVES:
@@ -103,23 +133,24 @@ def validate_chart(song: dict, c: dict, density: str = "normal") -> list[str]:
         if b["t"] <= a["t"]:
             e(f"{tag}: not sorted")
         gap = b["t"] - end(a)
-        need = min_gap(a, b, P, density)
+        gb = beats_between(c, end(a), b["t"])
+        need = min_gap(a, b, c, density)
         if gap < need - TOL:
             e(f"{tag}: gap {gap:.3f}s < {need:.3f}s")
-        if b["move"] == "sweep" and gap < SWEEP_FREE_BEFORE * P - TOL:
-            e(f"{tag}: needs a free beat before the sweep (gap {gap/P:.2f} beats)")
-        if a["move"] == "sweep" and gap < SWEEP_FREE_AFTER * P - TOL:
-            e(f"{tag}: needs >=1 beat after the sweep (gap {gap/P:.2f} beats)")
-        if b["move"] == PHOTO and gap < PHOTO_BEFORE * P - TOL:
-            e(f"{tag}: needs 2 free beats before the photo (gap {gap/P:.2f} beats)")
-        if a["move"] == PHOTO and gap < PHOTO_AFTER * P - TOL:
-            e(f"{tag}: needs >=1 free beat after the photo (gap {gap/P:.2f} beats)")
+        if b["move"] == "sweep" and gb < SWEEP_FREE_BEFORE - BTOL:
+            e(f"{tag}: needs a free beat before the sweep (gap {gb:.2f} beats)")
+        if a["move"] == "sweep" and gb < SWEEP_FREE_AFTER - BTOL:
+            e(f"{tag}: needs >=1 beat after the sweep (gap {gb:.2f} beats)")
+        if b["move"] == PHOTO and gb < PHOTO_BEFORE - BTOL:
+            e(f"{tag}: needs 2 free beats before the photo (gap {gb:.2f} beats)")
+        if a["move"] == PHOTO and gb < PHOTO_AFTER - BTOL:
+            e(f"{tag}: needs >=1 free beat after the photo (gap {gb:.2f} beats)")
     if density != "hard":
         chain = 1
         for a, b in zip(notes, notes[1:]):
             if PHOTO in (a["move"], b["move"]):      # photos are outside the density rules
                 chain = 0 if b["move"] == PHOTO else 1
-            elif b["t"] - end(a) < REST_BEATS * P - TOL and "sweep" not in (a["move"], b["move"]):
+            elif beats_between(c, end(a), b["t"]) < REST_BEATS - BTOL and "sweep" not in (a["move"], b["move"]):
                 chain += 1
                 if chain > MAX_CHAIN:
                     e(f">{MAX_CHAIN} notes without a 1-beat rest ending at {b['t']:.3f}")
@@ -128,7 +159,7 @@ def validate_chart(song: dict, c: dict, density: str = "normal") -> list[str]:
                 chain = 1
         opp = {"split_lu": "split_ld", "split_ld": "split_lu"}
         for a, b in zip(notes, notes[1:]):
-            if opp.get(a["move"]) == b["move"] and b["t"] - a["t"] < REST_BEATS * P - TOL:
+            if opp.get(a["move"]) == b["move"] and beats_between(c, a["t"], b["t"]) < REST_BEATS - BTOL:
                 e(f"split flip {a['t']:.3f}->{b['t']:.3f} faster than 2 beats")
     if "camera" in c:
         errs += validate_camera(c, dur)
@@ -139,6 +170,11 @@ def validate_chart(song: dict, c: dict, density: str = "normal") -> list[str]:
     return errs
 
 
+def _nearest(xs: list[float], t: float) -> tuple[int, float]:
+    i = min(range(len(xs)), key=lambda k: abs(xs[k] - t))
+    return i, abs(xs[i] - t)
+
+
 def validate_camera(c: dict, dur: float) -> list[str]:
     errs = []
     cam = c.get("camera")
@@ -146,8 +182,8 @@ def validate_camera(c: dict, dur: float) -> list[str]:
         return ["no camera track"]
     if not cam:
         return ["empty camera track"]
-    bar = 4 * 60.0 / c["bpm"]
     dbs = c.get("downbeats") or []
+    bar_of = []
     for i, q in enumerate(cam):
         tag = f"camera#{i} t={q.get('t')}"
         if q.get("shot") not in SHOTS:
@@ -156,17 +192,21 @@ def validate_camera(c: dict, dur: float) -> list[str]:
             errs.append(f"{tag}: outside the song")
         if not (0 <= q.get("ease", -1) <= 4):
             errs.append(f"{tag}: bad ease {q.get('ease')}")
-        if q["t"] > 0 and dbs and min(abs(q["t"] - d) for d in dbs) > DOWNBEAT_TOL:
-            errs.append(f"{tag}: not on a downbeat")
-    for a, b in zip(cam, cam[1:]):
+        if dbs:
+            k, d = _nearest(dbs, q["t"])
+            bar_of.append(0 if q["t"] == 0 else k)
+            if q["t"] > 0 and d > DOWNBEAT_TOL:
+                errs.append(f"{tag}: not on a downbeat")
+    for i, (a, b) in enumerate(zip(cam, cam[1:])):
         if b["t"] <= a["t"]:
             errs.append(f"camera not sorted at {b['t']}")
-        elif b["t"] - a["t"] < CAM_MIN_BARS * bar - DOWNBEAT_TOL:
+        elif bar_of and bar_of[i + 1] - bar_of[i] < CAM_MIN_BARS:
             errs.append(f"camera cues {a['t']} -> {b['t']} closer than {CAM_MIN_BARS} bars")
     return errs
 
 
 def validate_preview(song: dict, downbeats: list[float]) -> list[str]:
+    """inside the song, 12-20 s, starts AND ends on downbeats (= a whole number of bars, even if the tempo drifts)"""
     pv = song.get("preview")
     if not pv:
         return ["no preview"]
@@ -176,12 +216,30 @@ def validate_preview(song: dict, downbeats: list[float]) -> list[str]:
         errs.append(f"preview {s}+{d} outside the song")
     if not (PREVIEW_SEC[0] - TOL <= d <= PREVIEW_SEC[1] + TOL):
         errs.append(f"preview dur {d} not in {PREVIEW_SEC}")
-    bar = 4 * 60.0 / song["bpm"]
-    if abs(d / bar - round(d / bar)) * bar > DOWNBEAT_TOL:
-        errs.append(f"preview dur {d} is not a whole number of bars ({d / bar:.3f})")
-    if downbeats and min(abs(s - x) for x in downbeats) > DOWNBEAT_TOL:
-        errs.append(f"preview start {s} not on a downbeat")
+    if downbeats:
+        if _nearest(downbeats, s)[1] > DOWNBEAT_TOL:
+            errs.append(f"preview start {s} not on a downbeat")
+        if _nearest(downbeats, s + d)[1] > DOWNBEAT_TOL:
+            errs.append(f"preview end {s + d:.3f} not on a downbeat (not a whole number of bars)")
+    else:
+        bar = 4 * 60.0 / song["bpm"]
+        if abs(d / bar - round(d / bar)) * bar > DOWNBEAT_TOL:
+            errs.append(f"preview dur {d} is not a whole number of bars")
     return errs
+
+
+MOVE_WEIGHT = {"up": 1.0, "down": 1.0, "clap": 1.0, "split_lu": 1.6, "split_ld": 1.6, "sweep": 2.0}
+
+
+def difficulty_score(c: dict) -> float:
+    """same definition as tools/chart/make_chart.py difficulty_score (independent re-implementation)"""
+    ms = [n for n in c["notes"] if n["move"] != PHOTO]
+    span = max(1.0, ms[-1]["t"] - ms[0]["t"])
+    load = sum(MOVE_WEIGHT[n["move"]] for n in ms)
+    for a, b in zip(ms, ms[1:]):
+        if beats_between(c, end(a), b["t"]) < 1.05:
+            load += MOVE_WEIGHT[b["move"]]
+    return load / span
 
 
 # ------------------------------------------------------------------ pytest tests
@@ -234,11 +292,11 @@ def test_photo_cues():
         ph = [n for n in c["notes"] if n["move"] == PHOTO]
         assert len(ph) == N_PHOTOS, f"{song['id']}: {len(ph)} photo cues"
         assert all(set(n) == {"t", "move"} for n in ph), "photo notes are {t, move} only"
-        for n in ph:
-            assert min(abs(n["t"] - x) for x in c["downbeats"]) <= DOWNBEAT_TOL, f"photo {n['t']} not on a downbeat"
+        for n in ph:   # on the beat grid (the app counts 3-2-1 on the beat); downbeat unless pinned on a sung word
+            assert _nearest(c["beats"], n["t"])[1] <= DOWNBEAT_TOL, f"{song['id']}: photo {n['t']} not on a beat"
         ts = [n["t"] for n in ph]
-        assert ts[0] >= PHOTO_MIN_T, f"first photo at {ts[0]} (< ~30 s)"
-        assert all(b - a >= PHOTO_SPREAD for a, b in zip(ts, ts[1:])), f"photos not spread: {ts}"
+        assert ts[0] >= PHOTO_MIN_T, f"{song['id']}: first photo at {ts[0]} (< ~30 s)"
+        assert all(b - a >= PHOTO_SPREAD for a, b in zip(ts, ts[1:])), f"{song['id']}: photos not spread: {ts}"
         # the free-beats-around-a-photo rule is checked in validate_chart
 
 
@@ -248,47 +306,105 @@ def test_previews():
         assert not errs, f"{song['id']}: " + "; ".join(errs)
 
 
-def _has(notes, t, move, tol=0.06):
-    return any(abs(n["t"] - t) <= tol and n["move"] == move for n in notes)
+# ---- per-song regression: hand-pinned vocal commands, photos, camera, preview (public/songs/<id>/overrides.json)
+# "vocal" times were measured on the demucs vocal stem: MMS forced alignment (System Online) or vocal attacks
+# = 300-3000 Hz onsets near the whisper/forced-alignment word (Arms Up / Wawa Hero). Each note must sit within
+# +-30 ms of the sung command. (t_vocal, move); sweeps also check where they end.
+SONGS = {
+    "arms-up-arms-down": {
+        "energy": 1,
+        "commands": [(35.720, "up"), (37.465, "down"), (39.030, "clap"), (39.610, "clap"), (40.555, "clap"),
+                     (40.980, "clap"), (42.740, "up"), (44.500, "down"), (46.675, "sweep"),
+                     (81.150, "up"), (82.890, "down"), (84.355, "clap"), (85.025, "clap"), (85.960, "clap"),
+                     (86.375, "clap"), (88.140, "up"), (89.845, "down"), (92.000, "sweep")],
+        "sweep_ends": [47.985, 93.365],          # "...sweep down LOW"
+        "photos": [33.959, 49.784, 65.503, 95.097],
+        "camera": {33.959: "drop", 37.489: "close", 49.784: "orbit", 77.717: "drop", 81.189: "close", 95.097: "drop"},
+        "preview_start": 33.959,
+        "no_notes_before": 5.7,                  # fiddle/banjo kick-off
+        "last_note": (104.871, "clap"),          # the hard stop
+    },
+    "wawa-hero": {
+        "energy": 2,
+        "commands": [(45.090, "clap"), (46.085, "up"), (47.020, "clap"), (48.010, "down"), (48.440, "clap"),
+                     (48.900, "clap"), (52.790, "split_lu"), (55.010, "split_ld"), (58.575, "sweep"),
+                     (121.975, "clap"), (123.025, "up"), (123.920, "clap"), (124.905, "down"), (125.385, "clap"),
+                     (125.865, "clap"), (129.685, "split_lu")],
+        "sweep_ends": [60.390],                  # "...to the GROUND" (chorus 2 does not sing it)
+        "photos_on_words": [40.295, 113.375],    # "Strike a POSE" vocal attacks (photo on the nearest beat)
+        "camera": {43.201: "drop", 120.117: "drop"},
+        "camera_last": "wide",
+        "preview_start": 43.201,
+        "no_notes_before": 6.4,                  # solo wah-wah riff
+        "nothing_after": 143.11,                 # hard stop
+    },
+    "system-online": {
+        "energy": 3,
+        "commands": [(51.951, "up"), (53.141, "down"), (53.606, "clap"), (53.846, "clap"), (55.760, "split_lu"),
+                     (124.332, "up"), (125.522, "down"), (125.987, "clap"), (126.207, "clap"), (128.141, "split_lu"),
+                     (114.332, "sweep")],
+        "photos": [65.046, 122.189, 139.332, 160.284],
+        "camera": {51.713: "close", 124.094: "close", 139.332: "drop"},
+        "preview_start": 51.713,
+        "no_notes_before": 21.0,                 # spoken intro
+    },
+}
 
 
-def _system_online():
-    return next((s for s in load_index()["songs"] if s["id"] == "system-online"), None)
+def _songs_by_id():
+    return {s["id"]: s for s in load_index()["songs"]}
 
 
-def test_system_online_follows_the_voice():
-    """Regression for the hand-pinned vocal commands (public/songs/system-online/overrides.json)."""
-    song = _system_online()
-    if song is None:
-        return
-    c = load_chart(song)
-    ns = c["notes"]
-    for shift in (0.0, 72.381):           # chorus 2 is chorus 1 + 152 beats @126 BPM
-        assert _has(ns, 51.951 + shift, "up"), ("Arms. Up.", shift)
-        assert _has(ns, 53.141 + shift, "down"), ("Arms. Down.", shift)
-        assert _has(ns, 55.760 + shift, "split_lu"), ("Left up.", shift)
-        assert any(n["move"] == "split_ld" and 57.9 + shift <= n["t"] <= 58.9 + shift for n in ns), shift
-    assert any(n["move"] == "sweep" and abs(n["t"] - 114.32) < 0.06 for n in ns), "top to floor"
-    assert not any(n["t"] < 21.0 for n in ns), "notes during the spoken intro"
-    assert abs(song["preview"]["start"] - 51.71) < 0.05, "preview should start on chorus 1 ('Arms. Up.')"
-    cam = {round(q["t"], 1): q for q in c["camera"]}
-    assert cam[51.7]["shot"] == "close" and cam[51.7]["ease"] == 0, "close cut on chorus 1 commands"
-    assert cam[124.1]["shot"] == "close", "close on chorus 2 commands"
-    assert cam[139.3]["shot"] == "drop", "drop on the drop"
-    photos = [n["t"] for n in ns if n["move"] == PHOTO]
-    assert photos == [65.046, 122.189, 139.332, 160.284], photos
+def test_index_order_and_energy():
+    """song select lists the easiest first; pips 1/2/3 match a measured difficulty that really increases"""
+    songs = load_index()["songs"]
+    ids = [s["id"] for s in songs]
+    assert ids[:3] == ["arms-up-arms-down", "wawa-hero", "system-online"], ids
+    assert [s["energy"] for s in songs] == sorted(s["energy"] for s in songs), "index must be sorted easiest first"
+    for sid, exp in SONGS.items():
+        assert _songs_by_id()[sid]["energy"] == exp["energy"], sid
+    scores = [difficulty_score(load_chart(_songs_by_id()[sid])) for sid in ("arms-up-arms-down", "wawa-hero", "system-online")]
+    assert scores[0] < scores[1] < scores[2], f"difficulty must increase with the song order: {scores}"
+
+
+def test_songs_follow_the_voice():
+    by_id = _songs_by_id()
+    for sid, exp in SONGS.items():
+        if sid not in by_id:
+            continue
+        c = load_chart(by_id[sid])
+        ns = c["notes"]
+        for t, mv in exp["commands"]:
+            near = [n for n in ns if n["move"] == mv and abs(n["t"] - t) <= DOWNBEAT_TOL]
+            assert near, f"{sid}: no {mv} within 30 ms of the sung command at {t}"
+        for te in exp.get("sweep_ends", []):
+            assert any(n["move"] == "sweep" and abs(n["t"] + n["dur"] - te) <= DOWNBEAT_TOL for n in ns), (sid, te)
+        assert not any(n["t"] < exp["no_notes_before"] for n in ns), f"{sid}: notes during the intro"
+        if "nothing_after" in exp:
+            assert all(end(n) < exp["nothing_after"] for n in ns), f"{sid}: note after the hard stop"
+        if "last_note" in exp:
+            t, mv = exp["last_note"]
+            assert ns[-1]["move"] == mv and abs(ns[-1]["t"] - t) <= DOWNBEAT_TOL, (sid, ns[-1])
+        photos = [n["t"] for n in ns if n["move"] == PHOTO]
+        if "photos" in exp:
+            assert photos == exp["photos"], (sid, photos)
+        for t in exp.get("photos_on_words", []):
+            assert any(abs(p - t) <= 0.5 * local_beat(c, t) for p in photos), f"{sid}: no photo on the sung word at {t}"
+        cam = c["camera"]
+        for t, shot in exp["camera"].items():
+            assert any(abs(q["t"] - t) <= DOWNBEAT_TOL and q["shot"] == shot for q in cam), (sid, t, shot)
+        if "camera_last" in exp:
+            assert cam[-1]["shot"] == exp["camera_last"], sid
+        assert abs(by_id[sid]["preview"]["start"] - exp["preview_start"]) <= DOWNBEAT_TOL, sid
 
 
 def test_system_online_double_claps_on_the_vocal():
-    song = _system_online()
+    song = _songs_by_id().get("system-online")
     if song is None:
         return
     c = load_chart(song)
     claps = [n["t"] for n in c["notes"] if n["move"] == "clap"]
     P = 60.0 / c["bpm"]
-    for sung in SYSTEM_ONLINE_SUNG_CLAPS:
-        near = min(claps, key=lambda t: abs(t - sung))
-        assert abs(near - sung) <= DOWNBEAT_TOL, f"sung clap at {sung}: nearest chart clap {near}"
     for first in SYSTEM_ONLINE_SUNG_CLAPS[0::2]:
         a = min(claps, key=lambda t: abs(t - first))
         b = claps[claps.index(a) + 1]

@@ -20,7 +20,10 @@ What it does:
 2. Analysis (decoded through ffmpeg, the same gapless handling as the browser):
    - **BPM**: comb-filter fit of the onset envelope over 60–200 BPM. The winner is folded into the
      dance range 90–150 to settle half/double-time ambiguity, then refined to 0.01 BPM and rounded to an integer
-     if it's within 0.06. A rigid grid is used unless the tempo drifts (then librosa's tracked beats are used).
+     if it's within 0.06. A rigid grid is used unless the tempo drifts. Generated songs often wander section by section,
+     so the check compares librosa's tracked beats with the rigid grid in 32-beat windows. If any window is > 30 ms off, the chart
+     follows the tracked beats (glitches > 25 ms off a local fit are repaired), and `bpm` is the mean tempo. All beat-based
+     rules (gaps, sweep lengths, camera spacing, preview bars) are then measured on the local beat, not the median BPM.
    - **Downbeats**: the beat phase (mod 4) with the most chroma change, low-band (kick) onsets and loudness jumps.
      The chart's `offset` is the first downbeat.
    - **Sections**: bar-level MFCC+chroma self-similarity (Foote novelty) plus loudness novelty. Boundaries
@@ -46,7 +49,8 @@ What it does:
    between front/low_right/high/low_left. Calm sections glide (ease 2 s) between orbit/high/wide. The same shot is never
    used twice in a row. Ease is clamped to half the time until the next cue.
 6. **Photo cues** (`{"t", "move": "photo"}`, a free "strike a pose" moment, never judged). There are exactly 4 per chart, at the
-   same times in every difficulty, on downbeats, the first not before 30 s, ≥ 15 s apart. Auto placement splits the
+   same times in every difficulty, on the beat grid (auto-placed ones on downbeats; pinned ones on the nearest beat, e.g. a
+   sung "Strike a POSE"), the first not before 30 s, ≥ 15 s apart. Auto placement splits the
    play window into 4 parts. In each part it takes the best downbeat (high-energy section entry > last bar of a section > 4-bar
    phrase start), as long as it doesn't crowd a hand-pinned note. Photos are inserted as pinned notes, so the ergonomics pass clears
    generated notes around them (≥ 2 beats free before, ≥ 1 beat after, ≥ 0.9 s on easy). They are left out of the density
@@ -56,8 +60,11 @@ What it does:
 8. Writes `public/songs/<id>/chart.json` (`version`, `songId`, `bpm`, `offset`, `beats`, `downbeats`, `sections`,
    `notes`, `camera`; no `difficulty`) and deletes an old per-difficulty `charts/` dir. It upserts the song into
    `public/songs/index.json` with `"chart": "songs/<id>/chart.json"`, `moves` used, duration, `photos`, `preview`
-   and `energy`. Energy is 1–3 pips that now tell players how demanding the chart is: move notes/s over the play window ×
-   (1 + ½ × share of splits and sweeps). Below 0.75 is 1, below 1.25 is 2, anything higher is 3.
+   and `energy`. Energy is 1–3 pips telling players how demanding the chart is. The **difficulty score** is the physical
+   load per second: each move weighs by kind (tap 1, split 1.6, sweep 2), and counts again when it follows the previous move
+   within about 1 beat. Below 1.0 is 1 pip, below 1.35 is 2, anything higher is 3. `"energy"` in overrides pins the pips (the 3 shipped songs
+   pin the user's ranking; tests check the measured scores still increase in that order). index.json is sorted by energy,
+   easiest first (ties keep their order).
 
 ### Ergonomic rules (enforced by the generator, checked by `tests/chart`)
 
@@ -84,13 +91,20 @@ All times are seconds in `audio.mp3`. Any key can be left out. Keys starting wit
 {
   "version": 1,
   "analysis": { "bpm": 126.0, "offset": 0.284 },   // force tempo and/or the first downbeat
+  "energy": 2,                                      // pin the song-select pips (else computed, see above)
+  "sectionMap": [                                   // REPLACE the detected structure (starts snapped to downbeats)
+    { "start": 0, "label": "intro", "level": 0 },     // intro + level 0 = no notes
+    { "start": 6.5, "label": "groove", "level": 0, "moves": ["up", "down", "clap"] },  // optional move whitelist
+    { "start": 43.2, "label": "chorus", "level": 2 }  // same label = same routine (key)
+  ],
   "sections": [                                     // relabel / re-level detected sections (matched by midpoint)
     { "start": 112.7, "end": 124.1, "label": "bridge", "level": 0, "key": "chorus" }
   ],
   "noNotes": [ { "start": 0, "end": 21.0, "why": "spoken intro" } ],   // generator places nothing here
   "preview": { "start": 51.7, "bars": 8 },          // song-select loop: start snapped to the nearest downbeat;
                                                     // length in "bars" (or "dur" seconds, rounded to whole bars)
-  "photos": [                                       // photo cues, snapped to the nearest downbeat; if fewer than 4
+  "photos": [                                       // photo cues, snapped to the nearest beat ("snap": "downbeat"
+                                                    // to force a downbeat); if fewer than 4
     { "t": 65.0, "why": "after 'Overload'" }        // are given, the rest are auto-placed. They must leave 2 beats
   ],                                                // before / 1 after free of *pinned* notes (warned otherwise)
   "camera": [                                       // pinned camera cues (t snapped to the nearest downbeat; t=0 stays 0)
@@ -100,7 +114,8 @@ All times are seconds in `audio.mp3`. Any key can be left out. Keys starting wit
   "pins": [                                         // time range [start, end) replaced by hand-authored notes
     {
       "label": "chorus 1", "start": 51.236, "end": 65.998,
-      "snap": "half",                               // optional: snap times to the beat grid: beat | half | quarter
+      "snap": "half",                               // optional: snap times to the beat grid: beat | half | quarter;
+                                                    // a note with "snap": false keeps its exact time (sung off the grid)
       "notes":  [ { "t": 51.951, "move": "up" },     // the chart's notes in this range
                   { "t": 62.189, "move": "sweep", "durBeats": 4 } ],  // sweep length: "durBeats" or "dur" (s)
       "easy":   [ … ]                               // optional, only used with --difficulty easy (wins over "notes");
@@ -140,3 +155,14 @@ spectrogram of the vocal stem. The heavy deps (torch 2.5.1, demucs) download on 
 (0.24 s). Both claps are charted on the vocal (53.617 + 53.855 s, 125.998 + 126.236 s, on the half-beat grid), which
 uses the clap-pair exception. `analysis.offset` is pinned at 0.284 s so those grid times can't drift. The pins in
 `public/songs/system-online/overrides.json` carry a `lyric` comment on every note.
+
+### arms-up-arms-down / wawa-hero notes
+
+Both have **drifting tempos** (136→139.7 BPM and 123–126 BPM), so their charts follow the tracked beats. Callout
+times were found with `align_lyrics.py` (whisper medium with the lyrics as `--prompt`, plus forced alignment). Then
+vocal attacks (300–3000 Hz onsets on the demucs stem) were measured near each word. A note stays on the beat
+grid when the attack is within 30 ms, and otherwise uses the attack (`"snap": false`, with the offset in `why`). The demucs stems
+of these mixes keep a lot of instrument bleed, so forced-alignment scores were low. The attacks plus "chorus 2 = chorus 1 shifted
+by N beats" are what confirm the times. Wawa Hero's chorus 2 drops the callouts after "Left up!", and "(Clap clap!)" is not
+audible in either chorus. The routine is kept there anyway (marked in `lyric`).
+

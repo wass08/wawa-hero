@@ -68,10 +68,14 @@ def beat_str(t: float, grid) -> str:
     return f"beat {b:7.2f} -> snap {half:6.1f} @ {float(np.interp(half, np.arange(len(beats)), beats)):8.3f}s"
 
 
-def do_whisper(wav: Path, model: str, grid):
+def do_whisper(wav: Path, model: str, grid, prompt: str | None = None):
     from faster_whisper import WhisperModel
     m = WhisperModel(model, device="cpu", compute_type="int8")
-    segs, _ = m.transcribe(str(wav), word_timestamps=True, language="en", condition_on_previous_text=False)
+    audio, sr = sf.read(str(wav), dtype="float32")          # 16 kHz mono; avoids PyAV version issues
+    if audio.ndim > 1:
+        audio = audio.mean(1)
+    segs, _ = m.transcribe(audio, word_timestamps=True, language="en", condition_on_previous_text=False,
+                           initial_prompt=prompt)
     for s in segs:
         print(f"[{s.start:7.2f}-{s.end:7.2f}] {s.text.strip()}")
         for w in s.words or []:
@@ -103,6 +107,7 @@ def main():
     ap.add_argument("audio")
     ap.add_argument("--whisper", action="store_true", help="transcribe the vocal stem with word timestamps")
     ap.add_argument("--model", default="small")
+    ap.add_argument("--prompt", help="whisper initial prompt (e.g. the expected lyrics) to bias spelling")
     ap.add_argument("--range", nargs=2, type=float, metavar=("START", "END"))
     ap.add_argument("--text", help="known lyrics inside --range, for forced alignment")
     ap.add_argument("--no-separate", action="store_true", help="use the full mix instead of the vocal stem")
@@ -116,7 +121,7 @@ def main():
         wav = vocals(audio)
     grid = grid_for(audio)
     if a.whisper:
-        do_whisper(wav, a.model, grid)
+        do_whisper(wav, a.model, grid, a.prompt)
     if a.range and a.text:
         do_align(wav, a.range[0], a.range[1], a.text, grid)
     if not a.whisper and not (a.range and a.text):

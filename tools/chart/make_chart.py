@@ -107,6 +107,7 @@ class Section:
     label: str = "verse"
     energy: float = 0.0     # raw (dB-ish) energy score
     key: str = ""           # routine key: sections with the same key share a routine
+    moves: list[str] | None = None   # optional whitelist of moves for generated notes (overrides)
 
 
 @dataclass
@@ -156,6 +157,14 @@ class Analysis:
         if t >= self.beats[-1]:
             return float(n - 1 + (t - self.beats[-1]) / self.period)
         return float(np.interp(t, self.beats, np.arange(n)))
+
+    def local_period(self, t: float) -> float:
+        """beat length around t (= period on a rigid grid; follows tempo drift on tracked grids)"""
+        b = self.beat_at(t)
+        return self.time_at(b + 0.5) - self.time_at(b - 0.5)
+
+    def beats_later(self, t: float, nbeats: float) -> float:
+        return self.time_at(self.beat_at(t) + nbeats)
 
     def snap(self, t: float, step: float = 0.5) -> float:
         return self.time_at(round(self.beat_at(t) / step) * step)
@@ -241,13 +250,27 @@ def analyze(y: np.ndarray, sr: int = SR, force_bpm: float | None = None,
     _, bf = librosa.beat.beat_track(onset_envelope=oenv, sr=sr, hop_length=HOP, start_bpm=bpm, tightness=300)
     tracked = librosa.frames_to_time(bf, sr=sr, hop_length=HOP)
     if len(tracked) > 16:
-        dev = np.array([np.min(np.abs(grid - t)) for t in tracked])
-        drift = float(np.median(dev))
+        # signed deviation of tracked beats from the rigid grid, judged per 32-beat window: a tempo
+        # that wanders section by section (common in generated music) shows up as window offsets
+        dev = np.array([t - grid[np.argmin(np.abs(grid - t))] for t in tracked])
+        wins = [np.median(dev[i:i + 32]) for i in range(0, len(dev) - 16, 16)]
+        drift = float(np.max(np.abs(wins))) if wins else 0.0
     else:
         drift = 0.0
-    if drift > 0.035 and len(tracked) > 16 and not force_bpm:
-        beats = tracked
-        notes.append(f"tempo drifts (median {drift*1000:.0f} ms off a rigid grid): using tracked beats")
+    notes.append(f"rigid-grid fit: worst 32-beat window off by {drift * 1000:.0f} ms")
+    if drift > 0.030 and len(tracked) > 16 and not force_bpm:
+        # tempo really moves (live-feel / accelerating track): follow the tracked beats, but repair
+        # glitches = beats > 25 ms off a local quadratic fit over 9 beats
+        beats = np.array(tracked, dtype=float)
+        smooth = sps.savgol_filter(beats, 9, 2, mode="interp")
+        bad = np.abs(beats - smooth) > 0.025
+        beats[bad] = smooth[bad]
+        ibi = np.diff(beats)
+        bpm = float(60.0 * (len(beats) - 1) / (beats[-1] - beats[0]))   # mean tempo (median IBI is frame-quantised)
+        period = 60.0 / bpm
+        notes.append(f"tempo drifts: using tracked beats "
+                     f"({60 / np.percentile(ibi, 90):.1f}-{60 / np.percentile(ibi, 10):.1f} BPM, "
+                     f"{int(bad.sum())} glitches repaired)")
     else:
         beats = grid
 
@@ -434,7 +457,7 @@ class Note:
         return d
 
 
-def _routine(rng: random.Random, diff: str, level: int) -> dict:
+def _routine(rng: random.Random, diff: str, level: int, allowed: list[str] | None = None) -> dict:
     rhythms = RHYTHMS[diff][level]
     if diff == "easy":
         motifs = EASY_MOTIFS
@@ -442,6 +465,9 @@ def _routine(rng: random.Random, diff: str, level: int) -> dict:
         motifs = EASY_MOTIFS + SPLIT_MOTIFS
     else:
         motifs = SPLIT_MOTIFS * 2 + EASY_MOTIFS      # hard leans on split alternations
+    if allowed:
+        ok = [m for m in motifs if set(m) <= set(allowed)]
+        motifs = ok or [[m for m in TAPS if m in allowed] or ["clap"]]
     ra = rng.choice(rhythms)
     rb = rng.choice(rhythms)
     ma = rng.choice(motifs)
@@ -460,7 +486,7 @@ def choreograph(an: Analysis, diff: str, seed: int, no_notes: list[tuple[float, 
             continue     # intros (often speech / pads) stay empty
         key = f"{sec.key}:{sec.level}"
         if key not in cache:
-            cache[key] = _routine(rng, diff, sec.level)
+            cache[key] = _routine(rng, diff, sec.level, sec.moves)
         rt = cache[key]
         nbeats = 4 * (sec.end_bar - sec.start_bar)
         base = an.bar_beat(sec.start_bar)
@@ -491,6 +517,8 @@ def choreograph(an: Analysis, diff: str, seed: int, no_notes: list[tuple[float, 
                 if off != int(off):
                     mv = "clap"    # syncopated (half-beat) hits are claps
                 notes.append(Note(an.time_at(base + p * 8 + off), mv))
+            if sec.moves is not None and "sweep" not in sec.moves:
+                sweep_here = False
             if sweep_here and p * 8 + 4 < nbeats:
                 room = min(nbeats - (p * 8 + 4) - 1, SWEEP_MAX_BEATS)   # keep a free beat after
                 dur_b = 3.0 if room >= 3 else room
@@ -547,7 +575,7 @@ def _pin_notes(an: Analysis, pin: dict, diff: str) -> list[Note] | None:
             if mv not in MOVES:
                 raise ValueError(f"override note with unknown move {mv!r}")
             t = float(n["t"])
-            if step:
+            if step and n.get("snap", True) is not False:     # per-note "snap": false keeps the exact time
                 t = an.snap(t, step)
             dur = 0.0
             if mv == "sweep":
@@ -591,6 +619,23 @@ def apply_overrides(an: Analysis, gen: list[Note], ov: dict, diff: str) -> list[
 
 
 def apply_section_overrides(an: Analysis, ov: dict):
+    sm = ov.get("sectionMap")
+    if sm:
+        # hand-authored structure replaces the detected one (boundaries snapped to downbeats)
+        nb = an.n_bars()
+        starts = [0 if i == 0 else max(0, min(nb, bar_index(an, float(x["start"])))) for i, x in enumerate(sm)]
+        secs = []
+        for i, x in enumerate(sm):
+            a = starts[i]
+            b = starts[i + 1] if i + 1 < len(sm) else nb
+            if b <= a:
+                continue
+            lvl = int(x.get("level", 1))
+            secs.append(Section(a, b, 0.0 if i == 0 else bar_time(an, a),
+                                bar_time(an, b) if b < nb else an.duration,
+                                level=lvl, label=str(x.get("label", "verse")), energy=float(lvl),
+                                key=str(x.get("key", x.get("label", f"s{i}"))), moves=x.get("moves")))
+        an.sections = secs
     for so in ov.get("sections", []):
         a, b = float(so["start"]), float(so["end"])
         for s in an.sections:
@@ -627,12 +672,18 @@ def min_gap_between(a: Note, b: Note, P: float, diff: str) -> float:
 
 
 def enforce(notes: list[Note], an: Analysis, diff: str, warn=print) -> list[Note]:
-    P = an.period
+    def need(a: Note, b: Note) -> float:          # gap rules measured in LOCAL beats (tempo may drift)
+        return min_gap_between(a, b, an.local_period(0.5 * (a.end() + b.t)), diff)
+
+    def rest_between(a: Note, b: Note) -> float:
+        return REST_BEATS * an.local_period(0.5 * (a.end() + b.t)) - EPS
+
     notes = sorted(notes, key=lambda n: (n.t, not n.pinned))
     # clamp sweep durations
     for n in notes:
         if n.move == "sweep":
-            lo, hi = SWEEP_MIN_BEATS * P, SWEEP_MAX_BEATS * P
+            lo = an.beats_later(n.t, SWEEP_MIN_BEATS) - n.t
+            hi = an.beats_later(n.t, SWEEP_MAX_BEATS) - n.t
             if not (lo - EPS <= n.dur <= hi + EPS):
                 if n.pinned:
                     warn(f"  ! {diff}: pinned sweep at {n.t:.3f} has dur {n.dur:.3f}s outside 2-4 beats; clamped")
@@ -647,7 +698,7 @@ def enforce(notes: list[Note], an: Analysis, diff: str, warn=print) -> list[Note
         ok = True
         for p in pinned:
             a, b = (p, n) if p.t <= n.t else (n, p)
-            if b.t - a.end() < min_gap_between(a, b, P, diff):
+            if b.t - a.end() < need(a, b):
                 ok = False
                 break
         if ok:
@@ -658,7 +709,7 @@ def enforce(notes: list[Note], an: Analysis, diff: str, warn=print) -> list[Note
         drop = False
         while out:
             prev = out[-1]
-            if n.t - prev.end() >= min_gap_between(prev, n, P, diff):
+            if n.t - prev.end() >= need(prev, n):
                 break
             if not prev.pinned and (n.pinned or (n.move == "sweep" and prev.move != "sweep")):
                 out.pop()             # pinned notes win over generated ones; sweeps over generated taps
@@ -674,7 +725,7 @@ def enforce(notes: list[Note], an: Analysis, diff: str, warn=print) -> list[Note
     if diff != "hard":
         opp = {"split_lu": "split_ld", "split_ld": "split_lu"}
         for a, b in zip(out, out[1:]):
-            if not b.pinned and opp.get(a.move) == b.move and b.t - a.t < REST_BEATS * P - EPS:
+            if not b.pinned and opp.get(a.move) == b.move and b.t - a.t < rest_between(a, b):
                 b.move = "clap"
     # consecutive-notes-without-rest limit
     lim = MAX_CHAIN[diff]
@@ -685,7 +736,7 @@ def enforce(notes: list[Note], an: Analysis, diff: str, warn=print) -> list[Note
             res.append(n)
             chain = 0
             continue
-        if res and n.t - res[-1].end() < REST_BEATS * P - EPS and n.move != "sweep" and res[-1].move != "sweep" \
+        if res and n.t - res[-1].end() < rest_between(res[-1], n) and n.move != "sweep" and res[-1].move != "sweep" \
                 and res[-1].move != PHOTO:
             chain += 1
         else:
@@ -718,17 +769,18 @@ def _photo_ok(an: Analysis, t: float, pinned: dict[str, list[Note]]) -> bool:
     for diff, notes in pinned.items():
         for n in notes:
             a, b = (n, ph) if n.t <= t else (ph, n)
-            if b.t - a.end() < min_gap_between(a, b, an.period, diff):
+            if b.t - a.end() < min_gap_between(a, b, an.local_period(0.5 * (a.end() + b.t)), diff):
                 return False
     return True
 
 
 def choose_photos(an: Analysis, ov: dict, pinned: dict[str, list[Note]], warn=print) -> list[Photo]:
-    """Exactly N_PHOTOS free-pose cues on downbeats, shared by all difficulties: pinned from overrides,
-    the rest auto-placed at drops / section ends, spread across the play window."""
+    """Exactly N_PHOTOS free-pose cues: pinned ones from overrides (on the nearest beat, e.g. on a sung
+    "pose"), the rest auto-placed on downbeats at drops / section ends, spread across the play window."""
     photos = []
     for p in ov.get("photos", []):
-        t = bar_time(an, bar_index(an, float(p["t"])))
+        t = float(p["t"])           # pinned photos snap to the nearest beat (or downbeat with "snap": "downbeat")
+        t = bar_time(an, bar_index(an, t)) if p.get("snap") == "downbeat" else an.snap(t, 1.0)
         if not _photo_ok(an, t, pinned):
             warn(f"  ! photo pinned at {t:.3f} crowds a pinned note (needs {PHOTO_FREE_BEFORE:g} beats before, "
                  f"{PHOTO_FREE_AFTER:g} after)")
@@ -872,7 +924,6 @@ def camera_track(an: Analysis, seed: int, ov: dict, warn=print) -> list[Cue]:
         cues.append(Cue(bar_time(an, last_bar), "wide", 2.0, "music winds down: pull back wide"))
 
     # ---- pinned cues from overrides ----
-    bar_len = 4 * an.period
     pins = []
     for c in ov.get("camera", []):
         if c["shot"] not in SHOTS:
@@ -884,7 +935,7 @@ def camera_track(an: Analysis, seed: int, ov: dict, warn=print) -> list[Cue]:
     if pins:
         def clash(g):
             for p in pins:
-                if abs(g.t - p.t) < CAM_MIN_BARS * bar_len - EPS:
+                if abs(bar_index(an, g.t) - bar_index(an, p.t)) < CAM_MIN_BARS:
                     return True
                 if p.until is not None and p.t <= g.t < p.until - EPS:
                     return True
@@ -893,7 +944,7 @@ def camera_track(an: Analysis, seed: int, ov: dict, warn=print) -> list[Cue]:
     cues.sort(key=lambda c: (c.t, not c.pinned))
     out: list[Cue] = []
     for c in cues:
-        if out and c.t - out[-1].t < CAM_MIN_BARS * bar_len - EPS:
+        if out and bar_index(an, c.t) - bar_index(an, out[-1].t) < CAM_MIN_BARS:
             if c.pinned and not out[-1].pinned:
                 out.pop()
             elif not c.pinned:
@@ -951,15 +1002,28 @@ def chart_json(an: Analysis, song_id: str, notes: list[Note], camera: list[Cue] 
     }
 
 
+MOVE_WEIGHT = {"up": 1.0, "down": 1.0, "clap": 1.0, "split_lu": 1.6, "split_ld": 1.6, "sweep": 2.0}
+ENERGY_THRESHOLDS = (1.0, 1.35)   # difficulty score -> 1 / 2 / 3 pips
+
+
+def difficulty_score(an: Analysis, notes: list[Note]) -> float:
+    """Physical load per second: each move weighs by kind (splits/sweeps cost more) and counts double
+    when it follows the previous move within ~1 beat (fast changes). Photos are free."""
+    ms = [n for n in notes if n.move != PHOTO]
+    if len(ms) < 2:
+        return 0.0
+    span = max(1.0, ms[-1].t - ms[0].t)
+    load = sum(MOVE_WEIGHT[n.move] for n in ms)
+    for a, b in zip(ms, ms[1:]):
+        if b.t - a.end() < 1.05 * an.local_period(b.t):
+            load += MOVE_WEIGHT[b.move]
+    return load / span
+
+
 def song_energy(an: Analysis, notes: list[Note]) -> int:
-    """1-3 pips shown in song select = how demanding the chart is: move density (notes/s over the
-    play window, tempo included) weighted up by the share of harder moves (splits, sweeps)."""
-    moves = [n for n in notes if n.move != PHOTO]
-    active = max(1.0, an.play_end - an.play_start)
-    nps = len(moves) / active
-    hard = sum(n.move in ("split_lu", "split_ld", "sweep") for n in moves) / max(1, len(moves))
-    score = nps * (1.0 + 0.5 * hard)
-    return 1 if score < 0.75 else (2 if score < 1.25 else 3)
+    """1-3 pips shown in song select = how demanding the chart is (see difficulty_score)."""
+    d = difficulty_score(an, notes)
+    return 1 if d < ENERGY_THRESHOLDS[0] else (2 if d < ENERGY_THRESHOLDS[1] else 3)
 
 
 def upsert_index(index_path: Path, entry: dict):
@@ -970,7 +1034,8 @@ def upsert_index(index_path: Path, entry: dict):
     songs = [s for s in data.get("songs", []) if s.get("id") != entry["id"]]
     pos = next((i for i, s in enumerate(data.get("songs", [])) if s.get("id") == entry["id"]), len(songs))
     songs.insert(pos, entry)
-    data["songs"] = songs
+    # song select lists the easiest first: stable sort by energy pips (ties keep their order)
+    data["songs"] = sorted(songs, key=lambda s: s.get("energy", 2))
     write_json(index_path, data)
 
 
@@ -1066,7 +1131,7 @@ def main(argv=None):
         "id": song_id, "title": title, "artist": artist,
         "audio": f"songs/{song_id}/audio.mp3", "cover": f"songs/{song_id}/cover.jpg",
         "bpm": round(an.bpm, 2), "duration": round(an.duration, 2),
-        "energy": song_energy(an, notes),
+        "energy": int(ov["energy"]) if "energy" in ov else song_energy(an, notes),
         "moves": moves,
         "photos": sum(n.move == PHOTO for n in notes),
         "preview": preview,
@@ -1078,7 +1143,9 @@ def main(argv=None):
     # ---- report ----
     log(f"\n{title} — {artist}  ({fmt_t(an.duration)})")
     log(f"bpm {an.bpm:.2f}  beat {an.period*1000:.1f} ms  first downbeat (offset) {an.offset:.3f}s  "
-        f"play window {an.play_start:.2f}-{an.play_end:.2f}s  energy {entry['energy']}")
+        f"play window {an.play_start:.2f}-{an.play_end:.2f}s  energy {entry['energy']} "
+        f"(difficulty score {difficulty_score(an, notes):.2f} -> {song_energy(an, notes)} pips"
+        f"{', pinned by overrides' if 'energy' in ov else ''})")
     for n in an.notes:
         log(f"  note: {n}")
     log("sections:")

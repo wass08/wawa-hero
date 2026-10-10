@@ -1,0 +1,79 @@
+{
+ "version": 1,
+ "energy": 1,
+ "_energy": "easiest song (user ranking): country, up/down/clap",
+ "_doc": "Hand-authored pins for arms-up-arms-down (country barn dance, Suno). The tempo drifts 136 -> ~139 BPM, so the chart follows the tracked beat grid; times are seconds snapped to that grid. Chorus command times = consensus of MMS forced alignment + faster-whisper small/medium word starts on the demucs vocal stem (heavy instrument bleed: low confidence on several words; chorus 2 = chorus 1 + 104 beats in all three tools). 'Hey!'/'Ho!' shouts are left free as breathing room.",
+ "preview": {"start": 33.959, "bars": 8, "why": "chorus 1 from the gang shouts through the sweep (8 bars)"},
+ "photos": [
+  {"t": 33.959, "why": "beat 77: gang 'Hey! Hey! Hey!' right before chorus 1"},
+  {"t": 49.784, "why": "beat 113: right after chorus 1's sweep, the fiddle solo kicks in"},
+  {"t": 65.503, "why": "beat 149: fiddle and banjo solo, stomps"},
+  {"t": 95.097, "why": "beat 217: 'Yee-haw!' right after chorus 2's sweep"}
+ ],
+ "camera": [
+  {"t": 5.747, "shot": "orbit", "ease": 2.0, "why": "beat 13: fiddle and banjo kick-off"},
+  {"t": 19.876, "shot": "front", "ease": 1.5, "why": "beat 45: verse 'Well the fiddle's hot'"},
+  {"t": 26.924, "shot": "low_left", "ease": 1.0, "why": "beat 61: verse, second half"},
+  {"t": 33.959, "shot": "drop", "ease": 0, "why": "beat 77: gang shouts 'Hey! Hey! Hey!' into chorus 1"},
+  {"t": 37.489, "shot": "close", "ease": 0, "until": 46.277, "why": "beat 85: chorus 1 commands: see yourself"},
+  {"t": 46.277, "shot": "high", "ease": 0.8, "why": "beat 105: 'Reach up high and sweep down low': crane"},
+  {"t": 49.784, "shot": "orbit", "ease": 0, "why": "beat 113: fiddle and banjo solo"},
+  {"t": 56.796, "shot": "wide", "ease": 1.5, "why": "beat 129: solo: the whole barn"},
+  {"t": 63.774, "shot": "orbit", "ease": 1.5, "why": "beat 145: solo, second half"},
+  {"t": 70.74, "shot": "high", "ease": 1.0, "why": "beat 161: solo, last phrase"},
+  {"t": 77.717, "shot": "drop", "ease": 0, "why": "beat 177: gang shouts into chorus 2"},
+  {"t": 81.189, "shot": "close", "ease": 0, "until": 91.626, "why": "beat 185: chorus 2 commands"},
+  {"t": 91.626, "shot": "high", "ease": 0.8, "why": "beat 209: 'Reach up high and sweep down low'"},
+  {"t": 95.097, "shot": "drop", "ease": 0, "why": "beat 217: 'Yee-haw!'"},
+  {"t": 98.58, "shot": "orbit", "ease": 1.0, "why": "beat 225: outro fiddle run"},
+  {"t": 102.052, "shot": "wide", "ease": 2.0, "why": "beat 233: pull back before the hard stop"}
+ ],
+ "sectionMap": [
+  {"start": 0, "label": "intro", "level": 0, "why": "fiddle and banjo kick-off (no notes)"},
+  {"start": 5.747, "label": "warmup", "level": 0, "moves": ["up", "down", "clap"], "why": "stomps: gentle warm-up hits, up/down/clap only"},
+  {"start": 19.876, "label": "verse", "level": 1, "moves": ["up", "down", "clap", "sweep"]},
+  {"start": 33.959, "label": "chorus", "level": 2},
+  {"start": 49.784, "label": "solo", "level": 0, "moves": ["up", "down", "clap", "sweep"], "why": "fiddle and banjo solo, stomps and claps (kept light: easiest song)"},
+  {"start": 77.717, "label": "chorus", "level": 2},
+  {"start": 95.097, "label": "outro", "level": 1, "moves": ["up", "down", "clap", "sweep"], "why": "fiddle run, hard stop at ~104.9 s"}
+ ],
+ "pins": [
+  {
+   "label": "chorus 1 (commands 35.7-48.0 s)",
+   "start": 34.4, "end": 49.342, "snap": "half",
+   "notes": [
+    {"t": 35.724, "move": "up", "lyric": "Arms UP!"},
+    {"t": 37.489, "move": "down", "lyric": "Arms DOWN!"},
+    {"t": 39.044, "move": "clap", "lyric": "CLAP your hands"},
+    {"t": 39.61, "move": "clap", "lyric": "clap your HANDS", "snap": false, "why": "sung -96 ms off the beat grid: placed on the vocal"},
+    {"t": 40.577, "move": "clap", "lyric": "here WE"},
+    {"t": 41.006, "move": "clap", "lyric": "GO!"},
+    {"t": 42.74, "move": "up", "lyric": "Arms UP!", "snap": false, "why": "sung -31 ms off the beat grid: placed on the vocal"},
+    {"t": 44.524, "move": "down", "lyric": "Arms DOWN!"},
+    {"t": 46.675, "move": "sweep", "lyric": "reach up HIGH (arms overhead) ... sweep down LOW (ends on 'low')", "snap": false, "why": "sung -32 ms off the beat grid: placed on the vocal", "dur": 1.31}
+   ]
+  },
+  {
+   "label": "chorus 2 (commands 81.2-93.4 s; gang shouts 77.5-80.7 s left free)",
+   "start": 77.717, "end": 94.668, "snap": "half",
+   "notes": [
+    {"t": 81.15, "move": "up", "lyric": "Arms UP!", "snap": false, "why": "sung -39 ms off the beat grid: placed on the vocal"},
+    {"t": 82.918, "move": "down", "lyric": "Arms DOWN!"},
+    {"t": 84.355, "move": "clap", "lyric": "CLAP your hands", "snap": false, "why": "sung -102 ms off the beat grid: placed on the vocal"},
+    {"t": 85.025, "move": "clap", "lyric": "clap your HANDS", "snap": false, "why": "sung -88 ms off the beat grid: placed on the vocal"},
+    {"t": 85.972, "move": "clap", "lyric": "here WE"},
+    {"t": 86.401, "move": "clap", "lyric": "GO!"},
+    {"t": 88.143, "move": "up", "lyric": "Arms UP!"},
+    {"t": 89.845, "move": "down", "lyric": "Arms DOWN!", "snap": false, "why": "sung -39 ms off the beat grid: placed on the vocal"},
+    {"t": 92.0, "move": "sweep", "lyric": "reach up HIGH (arms overhead) ... sweep down LOW (ends on 'low')", "snap": false, "why": "sung -56 ms off the beat grid: placed on the vocal", "dur": 1.356}
+   ]
+  },
+  {
+   "label": "hard stop",
+   "start": 104.438, "end": 105.96, "snap": "half",
+   "notes": [
+    {"t": 104.867, "move": "clap", "lyric": "final stab / hard stop"}
+   ]
+  }
+ ]
+}

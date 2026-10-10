@@ -1,0 +1,86 @@
+{
+ "version": 1,
+ "energy": 2,
+ "_energy": "middle song (user ranking): has splits, more forgiving than System Online",
+ "_doc": "Hand-authored pins for wawa-hero (disco/funk, Suno). The tempo wanders 123-126 BPM (mean 124.7) section by section, so the chart follows the tracked beat grid. Callout times: whisper medium + MMS forced alignment located the words; the exact times are vocal attacks (300-3000 Hz onsets on the demucs vocal stem). Notes stay on the beat grid unless the singer is > 30 ms off it ('snap': false). Chorus 2 = chorus 1 + 160 beats; its vocal drops the callouts after 'Left up!' - the same dance routine is kept there. '(Clap clap!)' is not audible in either chorus.",
+ "preview": {"start": 43.201, "bars": 8, "why": "chorus 1 from its 'Wawa Hero!' entry"},
+ "photos": [
+  {"t": 40.298, "why": "beat 83: pre-chorus 1 'Strike a POSE'"},
+  {"t": 83.615, "why": "beat 173: instrumental break peak (brass stabs)"},
+  {"t": 113.383, "why": "beat 235: pre-chorus 2 'Strike a POSE'"},
+  {"t": 142.617, "why": "beat 296: last brass stab before the hard stop (~143.1 s)"}
+ ],
+ "camera": [
+  {"t": 6.502, "shot": "orbit", "ease": 2.0, "why": "beat 13: slap bass + drums join the wah-wah riff"},
+  {"t": 20.027, "shot": "front", "ease": 1.5, "why": "beat 41: verse 1 'City lights are calling'"},
+  {"t": 27.748, "shot": "low_left", "ease": 1.0, "why": "beat 57: verse 1, second half"},
+  {"t": 35.468, "shot": "high", "ease": 1.5, "why": "beat 73: pre-chorus 'Feel it rising'"},
+  {"t": 39.335, "shot": "close", "ease": 0.8, "why": "beat 81: 'Strike a pose' (photo)"},
+  {"t": 43.201, "shot": "drop", "ease": 0, "why": "beat 89: chorus entry 'Wawa Hero!'"},
+  {"t": 47.044, "shot": "close", "ease": 0, "until": 56.668, "why": "beat 97: callouts: see yourself"},
+  {"t": 56.668, "shot": "high", "ease": 0.8, "why": "beat 117: 'Reach for the stars and sweep 'em to the ground'"},
+  {"t": 60.523, "shot": "front", "ease": 0, "why": "beat 125: 'Wawa Hero' tag"},
+  {"t": 68.232, "shot": "low_right", "ease": 0, "why": "beat 141: tag, second half"},
+  {"t": 75.918, "shot": "orbit", "ease": 0, "why": "beat 157: instrumental break: brass stabs + wah solo"},
+  {"t": 83.615, "shot": "high", "ease": 1.2, "why": "beat 173: break peak (photo)"},
+  {"t": 87.458, "shot": "orbit", "ease": 1.0, "why": "beat 181: break, last phrase"},
+  {"t": 91.312, "shot": "front", "ease": 1.5, "why": "beat 189: verse 2 'Mirror ball is spinning'"},
+  {"t": 98.987, "shot": "low_left", "ease": 1.0, "why": "beat 205: verse 2, second half"},
+  {"t": 106.672, "shot": "high", "ease": 1.5, "why": "beat 221: pre-chorus 2"},
+  {"t": 112.431, "shot": "close", "ease": 0.8, "why": "beat 233: 'Strike a pose' (photo)"},
+  {"t": 120.117, "shot": "drop", "ease": 0, "why": "beat 249: chorus 2 entry 'Wawa Hero!'"},
+  {"t": 123.948, "shot": "close", "ease": 0, "until": 133.526, "why": "beat 257: callouts"},
+  {"t": 133.526, "shot": "high", "ease": 0.8, "why": "beat 277: sweep"},
+  {"t": 137.369, "shot": "front", "ease": 0, "why": "beat 285: outro"},
+  {"t": 141.189, "shot": "wide", "ease": 0, "why": "beat 293: final brass hits before the hard stop"}
+ ],
+ "sectionMap": [
+  {"start": 0, "label": "intro", "level": 0, "why": "bars 1-3: solo wah-wah riff (no notes)"},
+  {"start": 6.502, "label": "groove", "level": 0, "moves": ["up", "down", "clap"], "why": "slap bass + drums: warm-up"},
+  {"start": 20.027, "label": "verse", "level": 1, "moves": ["up", "down", "clap", "sweep"], "why": "verse 1 (8 bars)"},
+  {"start": 35.468, "label": "prechorus", "level": 1, "why": "pre-chorus 1 (4 bars)"},
+  {"start": 43.201, "label": "chorus", "level": 2, "why": "chorus 1 (9 bars incl. 'Wawa Hero!' pickup bar)"},
+  {"start": 60.523, "label": "tag", "level": 0, "moves": ["up", "down", "clap", "sweep"], "why": "'Wawa Hero' x3 post-chorus (8 bars, not in the lyric sheet)"},
+  {"start": 75.918, "label": "break", "level": 1, "moves": ["split_lu", "split_ld", "clap", "sweep"], "why": "instrumental break (8 bars): the split section"},
+  {"start": 91.312, "label": "verse", "level": 1, "moves": ["up", "down", "clap", "sweep"], "why": "verse 2 (8 bars)"},
+  {"start": 106.672, "label": "prechorus", "level": 1, "why": "pre-chorus 2 (7 bars: 2 extra bars before chorus 2)"},
+  {"start": 120.117, "label": "chorus", "level": 2, "why": "chorus 2 (10 bars; callouts stop after 'Left up!')"},
+  {"start": 139.285, "label": "outro", "level": 1, "why": "outro: brass hits, hard stop ~143.1 s"}
+ ],
+ "pins": [
+  {
+   "label": "chorus 1 (callouts 45.1-60.4 s)",
+   "start": 43.688, "end": 60.523, "snap": "half",
+   "notes": [
+    {"t": 45.116, "move": "clap", "lyric": "Wawa HE-ro!"},
+    {"t": 46.068, "move": "up", "lyric": "(Arms UP!)"},
+    {"t": 47.044, "move": "clap", "lyric": "Wawa HE-ro!"},
+    {"t": 48.007, "move": "down", "lyric": "(Arms DOWN!)"},
+    {"t": 48.46, "move": "clap", "lyric": "CLAP clap"},
+    {"t": 48.9, "move": "clap", "lyric": "clap CLAP (sung a full beat apart)", "snap": false, "why": "sung -48 ms off the beat grid: placed on the vocal"},
+    {"t": 52.814, "move": "split_lu", "lyric": "(Left UP!)"},
+    {"t": 54.991, "move": "split_ld", "lyric": "(Right UP!)"},
+    {"t": 57.156, "move": "clap", "lyric": "(Clap clap!) - not audible in the vocal; on the beat after 'Wawa Hero!'"},
+    {"t": 57.62, "move": "clap", "lyric": "(Clap clap!)"},
+    {"t": 58.596, "move": "sweep", "lyric": "reach for the STARS (arms up) ... sweep 'em to the GROUND", "dur": 1.794, "snap": false}
+   ]
+  },
+  {
+   "label": "chorus 2 (callouts 122.0-129.7 s, then no vocal callouts)",
+   "start": 120.593, "end": 137.369, "snap": "half",
+   "notes": [
+    {"t": 121.975, "move": "clap", "lyric": "Wawa HE-ro!", "snap": false, "why": "sung -46 ms off the beat grid: placed on the vocal"},
+    {"t": 123.025, "move": "up", "lyric": "(Arms UP!)", "snap": false, "why": "sung +52 ms off the beat grid: placed on the vocal"},
+    {"t": 123.948, "move": "clap", "lyric": "Wawa HE-ro!"},
+    {"t": 124.9, "move": "down", "lyric": "(Arms DOWN!)"},
+    {"t": 125.385, "move": "clap", "lyric": "CLAP clap", "snap": false, "why": "sung +32 ms off the beat grid: placed on the vocal"},
+    {"t": 125.865, "move": "clap", "lyric": "clap CLAP (sung a full beat apart)", "snap": false, "why": "sung +36 ms off the beat grid: placed on the vocal"},
+    {"t": 129.683, "move": "split_lu", "lyric": "(Left UP!)"},
+    {"t": 131.849, "move": "split_ld", "lyric": "(Right UP!) [not sung in chorus 2: routine kept]"},
+    {"t": 134.014, "move": "clap", "lyric": "(Clap clap!) - not audible in the vocal; on the beat after 'Wawa Hero!' [not sung in chorus 2: routine kept]"},
+    {"t": 134.49, "move": "clap", "lyric": "(Clap clap!) [not sung in chorus 2: routine kept]"},
+    {"t": 135.442, "move": "sweep", "lyric": "reach for the STARS (arms up) ... sweep 'em to the GROUND [not sung in chorus 2: routine kept]", "dur": 1.927, "snap": false}
+   ]
+  }
+ ]
+}

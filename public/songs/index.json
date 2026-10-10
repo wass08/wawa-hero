@@ -1,6 +1,52 @@
 {
  "songs": [
   {
+   "id": "arms-up-arms-down",
+   "title": "Arms Up, Arms Down",
+   "artist": "arabesquestreamingservice023",
+   "audio": "songs/arms-up-arms-down/audio.mp3",
+   "cover": "songs/arms-up-arms-down/cover.jpg",
+   "bpm": 137.18,
+   "duration": 105.96,
+   "energy": 1,
+   "moves": [
+    "up",
+    "down",
+    "clap",
+    "sweep"
+   ],
+   "photos": 4,
+   "preview": {
+    "start": 33.959,
+    "dur": 14.071
+   },
+   "chart": "songs/arms-up-arms-down/chart.json"
+  },
+  {
+   "id": "wawa-hero",
+   "title": "Wawa Hero",
+   "artist": "arabesquestreamingservice023",
+   "audio": "songs/wawa-hero/audio.mp3",
+   "cover": "songs/wawa-hero/cover.jpg",
+   "bpm": 124.71,
+   "duration": 144.56,
+   "energy": 2,
+   "moves": [
+    "up",
+    "down",
+    "clap",
+    "split_lu",
+    "split_ld",
+    "sweep"
+   ],
+   "photos": 4,
+   "preview": {
+    "start": 43.201,
+    "dur": 15.395
+   },
+   "chart": "songs/wawa-hero/chart.json"
+  },
+  {
    "id": "system-online",
    "title": "System Online",
    "artist": "arabesquestreamingservice023",
@@ -8,7 +54,7 @@
    "cover": "songs/system-online/cover.jpg",
    "bpm": 126.0,
    "duration": 183.52,
-   "energy": 2,
+   "energy": 3,
    "moves": [
     "up",
     "down",
