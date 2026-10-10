@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WAWA HERO · numeral font specimen</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Rubik:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&family=Silkscreen:wght@400;700&family=Press+Start+2P&family=Jersey+10&family=Chakra+Petch:wght@600;700&family=Rubik+Mono+One&family=Orbitron:wght@700;900&family=Bungee&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: oklch(0.16 0.07 285); --surface: oklch(0.22 0.07 290); --fg: oklch(0.97 0.01 280); --muted: oklch(0.80 0.05 285);
+  --border: oklch(0.42 0.10 290); --accent: oklch(0.70 0.25 345); --up: oklch(0.84 0.14 205); --down: oklch(0.86 0.17 88); --clap: oklch(0.70 0.25 345);
+  --perfect: oklch(0.90 0.20 135); --good: oklch(0.86 0.09 250); --miss: oklch(0.68 0.22 28);
+  --font-display: 'Pixelify Sans', 'Silkscreen', ui-monospace, monospace; --font-body: 'Rubik', system-ui, sans-serif; --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --u: 9px; --step: calc(var(--u) * 0.45);
+}
+* { box-sizing: border-box; }
+body { margin: 0; width: 1600px; background: var(--bg); color: var(--fg); font-family: var(--font-body); -webkit-font-smoothing: antialiased;
+  background-image: radial-gradient(70% 30% at 50% 0%, oklch(0.45 0.18 345 / .35), transparent 70%), radial-gradient(circle, oklch(0.9 0.1 300 / .14) 1.2px, transparent 1.6px); background-size: auto, 18px 18px; }
+.panel { background: color-mix(in oklch, var(--bg) 84%, transparent); box-shadow: inset 0 0 0 calc(var(--u) * 0.18) color-mix(in oklch, var(--border) 85%, transparent);
+  clip-path: polygon(var(--step) 0, calc(100% - var(--step)) 0, calc(100% - var(--step)) var(--step), 100% var(--step), 100% calc(100% - var(--step)), calc(100% - var(--step)) calc(100% - var(--step)), calc(100% - var(--step)) 100%, var(--step) 100%, var(--step) calc(100% - var(--step)), 0 calc(100% - var(--step)), 0 var(--step), var(--step) var(--step)); }
+header { padding: 26px 34px 10px; }
+header h1 { margin: 0; font: 700 26px var(--font-display); letter-spacing: .04em; }
+header p { margin: 6px 0 0; color: var(--muted); font-size: 14px; max-width: 1100px; line-height: 1.45; }
+.label { font-family: var(--font-body); font-weight: 600; font-size: 10.35px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); line-height: 1; }
+
+/* one band per candidate */
+.band { margin: 10px 34px 18px; padding: 16px 22px 18px; display: grid; grid-template-columns: 300px 1fr; gap: 10px 26px; --num: var(--font-display); --k: 1; --ls: 0; --num-weight: 700; --cell: 0.62em; }
+.band.pick { box-shadow: inset 0 0 0 3px var(--perfect); }
+.band .meta h2 { margin: 0; font: 700 22px var(--font-display); letter-spacing: .03em; display: flex; align-items: center; gap: 10px; }
+.band .meta h2 .pill { font: 700 11px var(--font-body); letter-spacing: .14em; color: var(--bg); background: var(--perfect); padding: 4px 7px 3px; }
+.band .meta h2 .pill.ru { background: var(--good); }
+.band .meta h2 .pill.now { background: var(--muted); }
+.band .meta .verdict { margin: 8px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.band .meta .verdict b { color: var(--fg); }
+.band .meta .css { margin: 10px 0 0; font: 500 11px/1.5 var(--font-mono); color: var(--up); white-space: pre; }
+.num { font-family: var(--num); font-weight: var(--num-weight); letter-spacing: var(--ls); font-variant-numeric: tabular-nums; font-feature-settings: 'tnum'; }
+.conf { display: flex; align-items: baseline; gap: 28px; }
+.conf .num { font-size: calc(54px * var(--k)); line-height: 1; }
+.conf .set { display: flex; flex-direction: column; gap: 4px; }
+.conf .set small { font: 600 10px var(--font-body); letter-spacing: .14em; color: var(--muted); text-transform: uppercase; }
+.conf .set .num { color: var(--fg); }
+.conf .set.warn .num { color: var(--down); }
+/* tabular test: two numbers that should align flush right */
+.tab { display: inline-grid; justify-items: end; }
+.tab .num { font-size: calc(26px * var(--k)); line-height: 1.05; }
+
+.situ { grid-column: 2; display: flex; gap: 14px; align-items: stretch; }
+.cell { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+.cell > small { font: 600 9px var(--font-body); letter-spacing: .14em; color: var(--muted); text-transform: uppercase; opacity: .7; }
+
+/* gameplay score panel ≈ hud .playing .score */
+.score { min-width: 198px; width: max-content; justify-items: end; display: grid; gap: 8px; }
+.score .digits { display: inline-flex; line-height: 1; font-size: calc(39.6px * var(--k)); }
+.score .digits span { display: inline-block; width: var(--cell, 0.62em); text-align: center; }
+.score .digits .z { color: color-mix(in oklch, var(--fg) 28%, transparent); }
+.score .row { display: flex; align-items: center; gap: 10px; }
+.stars { display: flex; gap: 4px; } .stars i { width: 21px; height: 21px; display: block; background: var(--down); clip-path: polygon(50% 0, 62% 35%, 100% 38%, 70% 62%, 80% 100%, 50% 78%, 20% 100%, 30% 62%, 0 38%, 38% 35%); }
+.stars i.off { background: color-mix(in oklch, var(--fg) 18%, transparent); }
+.mult { display: inline-grid; place-items: center; min-width: 40px; height: 27px; padding: 0 7px; font-size: calc(17px * var(--k)); color: var(--bg); background: var(--down); line-height: 1; }
+.calories { display: flex; gap: 5px; align-items: center; width: 100%; padding-top: 7px; border-top: 1px solid var(--border); }
+.calories .label { font-size: 7.2px; } .calories b { margin-left: auto; font-size: calc(18px * var(--k)); } .calories small { font: 500 9px var(--font-mono); color: var(--muted); }
+
+/* combo */
+.combo { text-align: center; justify-content: center; min-width: 96px; }
+.combo .n { font-size: calc(46.8px * var(--k)); line-height: .95; -webkit-text-stroke: 3px var(--bg); paint-order: stroke fill; }
+
+/* results */
+.results { min-width: 330px; }
+.results .points { font-size: calc(64px * var(--k)); line-height: .95; }
+.results .stat-row { display: flex; gap: 0; margin-top: 2px; }
+.results .stat { padding: 0 11px; border-left: 2px solid color-mix(in oklch, var(--border) 80%, transparent); } .results .stat:first-child { padding-left: 0; border-left: 0; }
+.results .stat dt { font: 600 9px/1 var(--font-body); letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+.results .stat dd { margin: 5px 0 0; font-size: calc(22px * var(--k)); line-height: 1; white-space: nowrap; }
+.results .stat dd.perfect { color: var(--perfect); } .results .stat dd.good { color: var(--good); } .results .stat dd.miss { color: var(--miss); }
+.results .stat dd small { font: 500 10px var(--font-mono); color: var(--muted); margin-left: 3px; }
+.results .kicker { font: 500 12px var(--font-mono); color: var(--muted); }
+.results .kicker .num { font-size: calc(12px * var(--k)); }
+
+/* setlist row + top heroes */
+.list { width: 240px; gap: 8px; }
+.row { display: grid; grid-template-columns: 22px 1fr auto; align-items: center; gap: 8px; padding: 6px 8px; background: color-mix(in oklch, var(--fg) 9%, transparent); }
+.row .no { font: 500 11px var(--font-mono); color: var(--muted); }
+.row .t { font: 700 16px var(--font-display); } .row .m { display: block; margin-top: 2px; font: 400 9px var(--font-body); color: var(--muted); }
+.row .m .num { font-size: calc(10px * var(--k)); font-weight: 700; color: var(--fg); }
+.heroes { display: grid; gap: 3px; margin-top: 2px; }
+.heroes li { list-style: none; display: grid; grid-template-columns: 12px 16px 1fr auto; align-items: center; gap: 6px; font: 500 10px var(--font-body); }
+.heroes li .r { color: var(--muted); font-family: var(--font-mono); } .heroes li .f { width: 14px; height: 10px; background: hsl(338 55% 34%); }
+.heroes li strong { font-size: calc(11px * var(--k)); }
+
+/* countdown */
+.count { justify-content: center; align-items: center; min-width: 110px; }
+.count .n { font-size: calc(96px * var(--k)); line-height: .9; color: var(--up); -webkit-text-stroke: 4px var(--bg); paint-order: stroke fill; text-shadow: 0 0 24px color-mix(in oklch, var(--up) 60%, transparent); }
+footer { padding: 6px 34px 30px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>NUMERALS · CANDIDATE FONTS IN SITU</h1>
+  <p>Headings/labels stay Pixelify Sans; only the numbers change. Each band: confusable digits at 54 px (how they read from 2 m), a tabular test (two numbers right-aligned must have identical widths), then the real HUD spots at their real 1600×900 sizes. <b style="color:var(--fg)">--k</b> is the optical size multiplier so each font matches the current layout's cap height.</p>
+</header>
+
+<template id="band">
+  <section class="band panel">
+    <div class="meta"><h2></h2><p class="verdict"></p><pre class="css"></pre></div>
+    <div class="conf">
+      <div class="set"><small>All digits</small><span class="num">0123456789</span></div>
+      <div class="set warn"><small>Confusables</small><span class="num">5S8B3 1l7 0O</span></div>
+      <div class="set"><small>Tabular</small><div class="tab"><span class="num">41,111</span><span class="num">40,000</span></div></div>
+    </div>
+    <div class="situ">
+      <div class="cell panel score"><small>Score panel</small>
+        <div class="digits num"><span class="z">0</span><span class="z">0</span><span>4</span><span>2</span><span>6</span><span>5</span><span>0</span></div>
+        <div class="row"><div class="stars"><i></i><i></i><i class="off"></i></div><span class="mult num">×4</span></div>
+        <div class="calories"><span class="label">Calories</span><b class="num">12.8</b><small>kcal</small></div>
+      </div>
+      <div class="cell panel combo"><small>Combo</small><div class="n num">64</div><div class="label">Combo</div></div>
+      <div class="cell panel results"><small>Results</small>
+        <div class="points num">42,650</div>
+        <dl class="stat-row"><div class="stat"><dt>Perfect</dt><dd class="num perfect">92</dd></div><div class="stat"><dt>Good</dt><dd class="num good">12</dd></div><div class="stat"><dt>Miss</dt><dd class="num miss">3</dd></div><div class="stat"><dt>Burned</dt><dd class="num">12.8<small>kcal</small></dd></div></dl>
+        <div class="kicker"><span class="num">1:44</span> · <span class="num">126</span> BPM</div>
+      </div>
+      <div class="cell panel list"><small>Setlist · Top heroes</small>
+        <div class="row"><span class="no">02</span><span><span class="t">Showtime</span><span class="m"><span class="num">125</span> BPM · <span class="num">2:25</span></span></span></div>
+        <ol class="heroes"><li><span class="r">1</span><span class="f"></span><span>PIXEL KAI</span><strong class="num">48,200</strong></li><li><span class="r">2</span><span class="f" style="background:hsl(96 55% 34%)"></span><span>NOVA</span><strong class="num">41,350</strong></li><li><span class="r">3</span><span class="f" style="background:hsl(205 55% 34%)"></span><span>MOON UNIT</span><strong class="num">38,800</strong></li></ol>
+      </div>
+      <div class="cell panel count"><small>Countdown</small><div class="n num">3</div></div>
+    </div>
+  </section>
+</template>
+
+<div id="bands"></div>
+<footer>Rendered at 1600 px · 1u = 9 px · fonts via Google Fonts.</footer>
+
+<script>
+const fonts = [
+  { name: 'Pixelify Sans (current)', pill: 'now', family: "'Pixelify Sans'", k: 1, weight: 700, ls: '0',
+    verdict: "<b>Baseline.</b> Proportional digits jitter as the score counts; 5/S and 3/8 share a silhouette, 1 is a bare stroke, 0 is round like O. Great voice, poor dial." },
+  { name: 'Silkscreen', family: "'Silkscreen'", k: 0.78, weight: 700, ls: '0.02em', cell: '0.95em',
+    verdict: "Pixel-faithful and monospaced, so no jitter, but the 2-px grid makes the 4 and 6 odd shapes and the strokes thin out at every size. 7-digit score needs ~35% more width. Charming, not legible." },
+  { name: 'Press Start 2P', family: "'Press Start 2P'", k: 0.72, weight: 400, ls: '0', cell: '1.05em',
+    verdict: "The arcade reference. Monospaced, massive, unmistakable 1/7 and 5/S. Very wide: a 7-digit score needs ~30% more room, and it shouts next to Pixelify headings." },
+  { name: 'Jersey 10', family: "'Jersey 10'", k: 1.22, weight: 400, ls: '0.03em', cell: '0.5em',
+    verdict: "Condensed pixel scoreboard. Tall, athletic, tabular. 3/8 and 5/S are separated by open counters. Light stroke: thin at small sizes, needs the big multiplier." },
+  { name: 'Chakra Petch', pill: 'pick', family: "'Chakra Petch'", k: 1.0, weight: 700, ls: '0.02em', cell: '0.62em',
+    verdict: "<b>Squared techno sans, non-pixel, tabular.</b> Flat-top 5 vs round S, open 3/8, narrow 0 vs wide O, flagged 1 vs straight 7. Bold holds at 10 px. Same width as Pixelify, so it drops into every panel as-is, and its chamfered corners read as LED-sign next to the voxel wordmark." },
+  { name: 'Rubik Mono One', pill: 'ru', family: "'Rubik Mono One'", k: 0.84, weight: 400, ls: '-0.02em', cell: '0.98em',
+    verdict: "<b>Runner-up.</b> Monospace heavyweight from the body family: every digit a different shape, huge counters, tabular by construction, matches the Rubik labels. Cost: ~40% wider than Pixelify, so the score panel, results score and ×4 chip all need to grow." },
+  { name: 'Orbitron', family: "'Orbitron'", k: 0.95, weight: 900, ls: '0.02em', cell: '0.8em',
+    verdict: "Sci-fi geometric. Tabular and heavy, but the 0 is a plain rounded square like O, and 3/8 close up at small sizes. Too 'spaceship', not enough 'concert'." },
+];
+const host = document.getElementById('bands'), tpl = document.getElementById('band');
+const range = (new URLSearchParams(location.search).get('bands') || '0-99').split('-').map(Number);
+fonts.forEach((f, i) => { if (i < range[0] || i > range[1]) return;
+  const node = tpl.content.cloneNode(true), band = node.querySelector('.band');
+  band.style.setProperty('--num', f.family + ", 'Pixelify Sans', ui-monospace, monospace");
+  band.style.setProperty('--k', f.k); band.style.setProperty('--num-weight', f.weight); band.style.setProperty('--ls', f.ls); band.style.setProperty('--cell', f.cell || '0.62em');
+  if (f.pill === 'pick') band.classList.add('pick');
+  const h2 = band.querySelector('h2'); h2.textContent = f.name;
+  if (f.pill) { const p = document.createElement('span'); p.className = 'pill ' + f.pill; p.textContent = f.pill === 'pick' ? 'RECOMMENDED' : f.pill === 'ru' ? 'RUNNER-UP' : 'CURRENT'; h2.append(p); }
+  band.querySelector('.verdict').innerHTML = f.verdict;
+  band.querySelector('.css').textContent = `--font-num: ${f.family}, ${f.family === "'Pixelify Sans'" ? "'Silkscreen'" : "'Pixelify Sans'"}, ui-monospace, monospace;\nfont: ${f.weight} calc(<size> * ${f.k}) var(--font-num); letter-spacing: ${f.ls}; /* .digits span width: ${f.cell || '0.62em'} */\nfont-variant-numeric: tabular-nums; font-feature-settings: 'tnum';`;
+  host.append(node);
+});
+</script>
+</body>
+</html>

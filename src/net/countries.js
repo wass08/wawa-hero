@@ -1,6 +1,7 @@
 // Country data for the scoreboard: ISO 3166-1 alpha-2 list, a best-effort
-// guess of the player's country, and flag rendering helpers.
-// Pure module: no network, safe to import anywhere (browser or Node tests).
+// guess of the player's country, and flags (real SVG flags from flag-icons via
+// flagUrl() / loadFlagImage(); emoji and monogram badges as fallbacks).
+// No network except loadFlagImage() fetching same-origin flag assets.
 
 /** All 249 ISO 3166-1 alpha-2 codes with short English names, sorted by name. */
 export const COUNTRIES = Object.freeze([
@@ -398,8 +399,102 @@ export function flagEmoji(code) {
   return [...code.trim().toUpperCase()].map(c => String.fromCodePoint(0x1f1e6 + c.charCodeAt(0) - 65)).join('');
 }
 
+// ---------------------------------------------------------------------------
+// Real flags: flag-icons (MIT) 4x3 SVGs, emitted by Vite as hashed asset files
+// and loaded lazily by URL. Only the URL map (a few KB of strings) is in the JS
+// bundle; 'no-inline' stops Vite from base64-inlining the small SVGs.
+// ---------------------------------------------------------------------------
+
+let FLAG_FILES = {};
+try {
+  FLAG_FILES = import.meta.glob('./??.svg', {
+    base: '/node_modules/flag-icons/flags/4x3/',
+    query: '?url&no-inline', import: 'default', eager: true,
+  });
+} catch { /* plain Node without Vite: no flag files, flagUrl() returns null */ }
+
+/** Intrinsic size given to flag images by loadFlagImage() (the SVGs' 4x3 viewBox). */
+export const FLAG_IMAGE_SIZE = Object.freeze({ width: 640, height: 480 });
+
 /**
- * Windows renders flag emoji as two letters, so prefer flagSvg() there.
+ * URL of the real 4x3 SVG flag for an ISO 3166-1 alpha-2 code ('fr', 'FR', ' fr ').
+ * Same-origin asset URL; use it in <img src>, CSS backgrounds, etc.
+ * Unknown codes, non-ISO codes and null -> null.
+ */
+export function flagUrl(code) {
+  const c = normalizeCountry(code);
+  if (!c) return null;
+  return FLAG_FILES[`./${c.toLowerCase()}.svg`] || null;
+}
+
+const flagImageCache = new Map(); // code -> Promise<HTMLImageElement|null>
+
+function loadImage(src) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.decoding = 'async';
+    img.onload = () => resolve(img);
+    img.onerror = () => resolve(null);
+    img.src = src;
+  });
+}
+
+/**
+ * Loads a flag as an HTMLImageElement ready for ctx.drawImage() or a WebGL /
+ * three.js texture. Resolves null for unknown codes, outside a browser, or on
+ * load failure (failures are not cached, so a later call retries).
+ * Cached per code: every call for 'FR' shares one image.
+ *
+ * The flag-icons SVGs only carry a viewBox, and some browsers (Firefox) refuse
+ * to draw or upload SVG images that have no intrinsic size. So the SVG text is
+ * fetched (same origin), given width=640 height=480, and loaded from a blob:
+ * URL. The canvas stays untainted. If fetch is unavailable, the asset URL is
+ * loaded directly.
+ */
+export function loadFlagImage(code) {
+  const c = normalizeCountry(code);
+  const url = c && flagUrl(c);
+  if (!url || typeof Image === 'undefined') return Promise.resolve(null);
+  if (flagImageCache.has(c)) return flagImageCache.get(c);
+  const promise = (async () => {
+    let src = url;
+    if (typeof fetch === 'function' && typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL) {
+      try {
+        const res = await fetch(url);
+        if (res.ok) {
+          let svg = await res.text();
+          if (!/<svg[^>]*\swidth=/i.test(svg)) {
+            svg = svg.replace(/<svg\b/i, `<svg width="${FLAG_IMAGE_SIZE.width}" height="${FLAG_IMAGE_SIZE.height}" preserveAspectRatio="none"`);
+          }
+          src = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+        }
+      } catch { /* fall back to the asset URL */ }
+    }
+    const img = await loadImage(src);
+    if (!img) {
+      flagImageCache.delete(c);
+      if (src !== url && src.startsWith('blob:')) URL.revokeObjectURL(src);
+    }
+    return img;
+  })();
+  flagImageCache.set(c, promise);
+  return promise;
+}
+
+/** Drops cached flag images (tests, or to free memory). */
+export function clearFlagImageCache() {
+  flagImageCache.clear();
+}
+
+// ---------------------------------------------------------------------------
+// Fallback-only helpers. Prefer flagUrl() / loadFlagImage() for display: the
+// monogram badge below is just the two letters in a box, and flagEmoji() shows
+// as two letters on Windows. Kept for backward compatibility and as a fallback
+// when flagUrl() returns null.
+// ---------------------------------------------------------------------------
+
+/**
+ * Windows renders flag emoji as two letters (fallback-only; see flagUrl()).
  * Heuristic on the platform string; pass a UA to test.
  */
 export function emojiFlagsSupported(ua) {
@@ -413,9 +508,8 @@ export function emojiFlagsSupported(ua) {
 }
 
 /**
- * Fallback flag: a small rounded badge with the code in it, as an SVG string
- * (inline it with innerHTML, or use flagDataUrl() for <img>/canvas).
- * Colour is derived from the code so each country keeps a stable tint.
+ * FALLBACK ONLY (use flagUrl() for real flags): a small rounded monogram badge
+ * with the code in it, as an SVG string. Colour is derived from the code.
  * Returns '' for invalid codes.
  */
 export function flagSvg(code, { height = 18 } = {}) {
@@ -430,7 +524,7 @@ export function flagSvg(code, { height = 18 } = {}) {
     + `<text x="16" y="16.5" text-anchor="middle" font-family="system-ui,Segoe UI,Arial,sans-serif" font-size="12" font-weight="700" letter-spacing="0.5" fill="#fff">${c}</text></svg>`;
 }
 
-/** flagSvg() as a data: URL (for <img src> or drawing on a canvas). */
+/** FALLBACK ONLY: flagSvg() monogram as a data: URL. Prefer flagUrl(). */
 export function flagDataUrl(code, opts) {
   const svg = flagSvg(code, opts);
   return svg ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}` : '';

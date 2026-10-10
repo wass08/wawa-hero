@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  COUNTRIES, TIMEZONE_COUNTRY, countryName, emojiFlagsSupported, flagDataUrl, flagEmoji, flagSvg,
-  guessCountry, normalizeCountry, regionOfLanguageTag,
+  COUNTRIES, FLAG_IMAGE_SIZE, TIMEZONE_COUNTRY, clearFlagImageCache, countryName, emojiFlagsSupported,
+  flagDataUrl, flagEmoji, flagSvg, flagUrl, guessCountry, loadFlagImage, normalizeCountry, regionOfLanguageTag,
 } from '../../src/net/countries.js';
 
 describe('COUNTRIES', () => {
@@ -125,5 +125,110 @@ describe('flags', () => {
     expect(emojiFlagsSupported('Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/130')).toBe(false);
     expect(emojiFlagsSupported('Windows')).toBe(false);
     expect(emojiFlagsSupported('Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) Safari/605')).toBe(true);
+  });
+});
+
+describe('flagUrl (flag-icons 4x3 SVG assets)', () => {
+  it.each(['fr', 'us', 'gb', 'jp', 'br'])('%s resolves to its own SVG, any case', code => {
+    const url = flagUrl(code);
+    expect(url).toMatch(new RegExp(`(^|/)${code}(-[\\w-]+)?\\.svg(\\?|$)`));
+    expect(flagUrl(code.toUpperCase())).toBe(url);
+    expect(flagUrl(` ${code} `)).toBe(url);
+  });
+
+  it('distinct codes give distinct URLs', () => {
+    expect(new Set(['fr', 'us', 'gb', 'jp', 'br'].map(flagUrl)).size).toBe(5);
+  });
+
+  it('every ISO country has a flag', () => {
+    const missing = COUNTRIES.filter(c => !flagUrl(c.code)).map(c => c.code);
+    expect(missing).toEqual([]);
+  });
+
+  it.each([null, undefined, '', 'X', 'FRA', 'UK', 'EU', 'XK', 'ZZ', 42])('%j -> null', code => {
+    expect(flagUrl(code)).toBeNull();
+  });
+});
+
+describe('loadFlagImage', () => {
+  const created = [];
+  class FakeImage {
+    constructor() { created.push(this); this.onload = null; this.onerror = null; this._src = ''; }
+    set src(v) {
+      this._src = v;
+      queueMicrotask(() => (FakeImage.fail ? this.onerror?.(new Event('error')) : this.onload?.()));
+    }
+    get src() { return this._src; }
+  }
+
+  function setup({ fetchOk = true } = {}) {
+    created.length = 0;
+    FakeImage.fail = false;
+    clearFlagImageCache();
+    const fetchMock = vi.fn(async () => new Response(
+      '<svg xmlns="http://www.w3.org/2000/svg" id="flag-icons-fr" viewBox="0 0 640 480"><path/></svg>',
+      { status: fetchOk ? 200 : 404 },
+    ));
+    const blobs = [];
+    vi.stubGlobal('Image', FakeImage);
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(URL, 'createObjectURL').mockImplementation(b => { blobs.push(b); return `blob:flag-${blobs.length}`; });
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {});
+    return { fetchMock, blobs };
+  }
+
+  afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); clearFlagImageCache(); });
+
+  it('loads once per code and caches the image (case-insensitive)', async () => {
+    const { fetchMock } = setup();
+    const [a, b] = await Promise.all([loadFlagImage('fr'), loadFlagImage('FR')]);
+    expect(a).toBeInstanceOf(FakeImage);
+    expect(b).toBe(a);
+    expect(await loadFlagImage(' fr ')).toBe(a);
+    expect(created).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0][0]).toBe(flagUrl('fr'));
+    const other = await loadFlagImage('jp');
+    expect(other).not.toBe(a);
+    expect(created).toHaveLength(2);
+  });
+
+  it('gives the SVG an intrinsic size and loads it from a same-origin blob URL', async () => {
+    const { blobs } = setup();
+    const img = await loadFlagImage('fr');
+    expect(img.src).toBe('blob:flag-1');
+    const text = await blobs[0].text();
+    expect(blobs[0].type).toBe('image/svg+xml');
+    expect(text).toContain(`width="${FLAG_IMAGE_SIZE.width}" height="${FLAG_IMAGE_SIZE.height}"`);
+    expect(text).toContain('viewBox="0 0 640 480"');
+  });
+
+  it('falls back to the asset URL when the fetch fails', async () => {
+    setup({ fetchOk: false });
+    const img = await loadFlagImage('br');
+    expect(img.src).toBe(flagUrl('br'));
+  });
+
+  it('resolves null for unknown codes without loading anything', async () => {
+    const { fetchMock } = setup();
+    expect(await loadFlagImage('XK')).toBeNull();
+    expect(await loadFlagImage(null)).toBeNull();
+    expect(created).toHaveLength(0);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not cache failures', async () => {
+    setup();
+    FakeImage.fail = true;
+    expect(await loadFlagImage('us')).toBeNull();
+    FakeImage.fail = false;
+    expect(await loadFlagImage('us')).toBeInstanceOf(FakeImage);
+    expect(created).toHaveLength(2);
+  });
+
+  it('resolves null outside a browser (no Image)', async () => {
+    clearFlagImageCache();
+    vi.stubGlobal('Image', undefined);
+    expect(await loadFlagImage('fr')).toBeNull();
   });
 });

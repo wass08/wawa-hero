@@ -16,7 +16,8 @@ What it does:
 
 1. Copies the mp3 to `public/songs/<id>/audio.mp3` (refuses to replace a different existing file without
    `--force`). If there's no `cover.jpg`, it extracts the embedded art, or writes a placeholder if the file
-   has none. Title and artist come from the tags (ffprobe). An existing `audio.mp3`/`cover.jpg` is never rewritten.
+   has none. The title comes from the tags (ffprobe). The artist is never copied from the tags (Suno writes the account
+   name there). index.json only gets an `"artist"` when you pass `--artist` or set `"artist"` in overrides.json. An existing `audio.mp3`/`cover.jpg` is never rewritten.
 2. Analysis (decoded through ffmpeg, the same gapless handling as the browser):
    - **BPM**: comb-filter fit of the onset envelope over 60–200 BPM. The winner is folded into the
      dance range 90–150 to settle half/double-time ambiguity, then refined to 0.01 BPM and rounded to an integer
@@ -62,7 +63,7 @@ What it does:
    `public/songs/index.json` with `"chart": "songs/<id>/chart.json"`, `moves` used, duration, `photos`, `preview`
    and `energy`. Energy is 1–3 pips telling players how demanding the chart is. The **difficulty score** is the physical
    load per second: each move weighs by kind (tap 1, split 1.6, sweep 2), and counts again when it follows the previous move
-   within about 1 beat. Below 1.0 is 1 pip, below 1.35 is 2, anything higher is 3. `"energy"` in overrides pins the pips (the 3 shipped songs
+   within about 1 beat (clap→clap clapping along excluded). Below 1.0 is 1 pip, below 1.35 is 2, anything higher is 3. `"energy"` in overrides pins the pips (the 3 shipped songs
    pin the user's ranking; tests check the measured scores still increase in that order). index.json is sorted by energy,
    easiest first (ties keep their order).
 
@@ -75,9 +76,10 @@ What it does:
 | sweep duration | 2–4 beats |
 | before a sweep | ≥ 2 beats from the previous note (one whole free beat to get the arms overhead) |
 | after a sweep | ≥ 1 beat |
-| normal: consecutive notes without a rest (gap ≥ 2 beats) | ≤ 6 (hard ≤ 8) |
+| normal: consecutive notes without a rest (gap ≥ 2 beats) | ≤ 6 (hard ≤ 8); clap→clap pairs (clapping along) don't extend the run |
 | easy/normal: split_lu ↔ split_ld flip (both forearms reverse) | ≥ 2 beats apart (generated flips become claps) |
 | photo cue | ≥ 2 beats free before, ≥ 1 beat after (and the 0.4 s / easy 0.9 s gap); no other density rules |
+| photo on the song's final hit (the chart's last note, e.g. a hard stop) | ≥ 1 beat free before (instead of 2) |
 | first note / last note | ≥ 2 s into the song, inside the play window, not in local silence |
 
 Pinned notes always win over generated ones. If two *pinned* notes break a rule, the tool prints a warning and keeps both,
@@ -103,8 +105,8 @@ All times are seconds in `audio.mp3`. Any key can be left out. Keys starting wit
   "noNotes": [ { "start": 0, "end": 21.0, "why": "spoken intro" } ],   // generator places nothing here
   "preview": { "start": 51.7, "bars": 8 },          // song-select loop: start snapped to the nearest downbeat;
                                                     // length in "bars" (or "dur" seconds, rounded to whole bars)
-  "photos": [                                       // photo cues, snapped to the nearest beat ("snap": "downbeat"
-                                                    // to force a downbeat); if fewer than 4
+  "photos": [                                       // photo cues, snapped to the nearest beat ("snap":
+                                                    // "downbeat" | "half" | false to change that); if fewer than 4
     { "t": 65.0, "why": "after 'Overload'" }        // are given, the rest are auto-placed. They must leave 2 beats
   ],                                                // before / 1 after free of *pinned* notes (warned otherwise)
   "camera": [                                       // pinned camera cues (t snapped to the nearest downbeat; t=0 stays 0)

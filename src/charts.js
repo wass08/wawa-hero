@@ -1,7 +1,7 @@
 import { MOVE_IDS } from './moves.js';
 export const siteURL = path => `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
 const fallbackSong = {
-  id: 'system-online', title: 'System Online', artist: 'Wawa Sensei', audio: 'songs/system-online/audio.mp3',
+  id: 'system-online', title: 'System Online', audio: 'songs/system-online/audio.mp3',
   cover: 'songs/system-online/cover.jpg', bpm: 120, duration: 183.5, energy: 2,
   moves: MOVE_IDS,
 };

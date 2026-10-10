@@ -1,3 +1,4 @@
+import {numeralHTML} from '../typography.js';
 import { CUES, iconSVG, token } from '../moves.js';
 import { fmtDigits, starsHTML, popJudge } from './helpers.js';
 import { sweepDescent } from '../game/versus.js';
@@ -18,10 +19,10 @@ export function createGameplayHUD() {
   addEventListener('resize',()=>width=track.clientWidth);
   return {
     setSong(song, nextChart, players=1) {
-      count=players;$('scoreLabel').textContent=count===2?'P1 · SCORE':'Score';
-      chart=nextChart; cursor=0; previous={}; width=track.clientWidth;
+      count=players;$('scoreLabel').innerHTML=count===2?'P<span class="num">1</span> · SCORE':'Score';
+      chart=nextChart; cursor=0; previous={}; flash=0; ring.style.setProperty('--f',0); width=track.clientWidth;
       $('songTitle').textContent=song.title;
-      $('songMeta').textContent=`${song.bpm.toFixed(0)} BPM`;
+      $('songMeta').innerHTML=`${numeralHTML(song.bpm.toFixed(0))} BPM`;
       for(const cue of cues) { cue.note=null; cue.el.style.display='none'; }
       $('judgeLayer').replaceChildren();
     },

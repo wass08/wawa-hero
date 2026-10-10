@@ -49,6 +49,7 @@ PREVIEW_BARS = 8
 PHOTO = "photo"           # free-pose "strike a pose" cue (not a dance move, never judged)
 N_PHOTOS = 4
 PHOTO_FREE_BEFORE, PHOTO_FREE_AFTER = 2.0, 1.0   # beats of free arms around a photo
+FINAL_PHOTO_FREE_BEFORE = 1.0   # exception: a photo that is the chart's LAST note (the song's final hit / hard stop)
 PHOTO_MIN_T, PHOTO_SPREAD = 30.0, 15.0           # first photo not before 30 s; photos >= 15 s apart
 
 # ---- ergonomic rules (physical: the player dances with their arms) ----
@@ -446,6 +447,7 @@ class Note:
     move: str
     dur: float = 0.0
     pinned: bool = False
+    final: bool = False       # photo on the song's final hit (relaxed free-before rule)
 
     def end(self) -> float:
         return self.t + (self.dur if self.move == "sweep" else 0.0)
@@ -665,7 +667,7 @@ def min_gap_between(a: Note, b: Note, P: float, diff: str) -> float:
     if b.move == "sweep":
         need = max(need, SWEEP_FREE_BEFORE * P)
     if b.move == PHOTO:
-        need = max(need, PHOTO_FREE_BEFORE * P)
+        need = max(need, (FINAL_PHOTO_FREE_BEFORE if b.final else PHOTO_FREE_BEFORE) * P)
     if a.move == PHOTO:
         need = max(need, PHOTO_FREE_AFTER * P)
     return need - EPS
@@ -736,7 +738,9 @@ def enforce(notes: list[Note], an: Analysis, diff: str, warn=print) -> list[Note
             res.append(n)
             chain = 0
             continue
-        if res and n.t - res[-1].end() < rest_between(res[-1], n) and n.move != "sweep" and res[-1].move != "sweep" \
+        if res and n.move == "clap" and res[-1].move == "clap":
+            pass                       # clapping along on the beat changes no pose: clap->clap doesn't extend the run
+        elif res and n.t - res[-1].end() < rest_between(res[-1], n) and n.move != "sweep" and res[-1].move != "sweep" \
                 and res[-1].move != PHOTO:
             chain += 1
         else:
@@ -765,7 +769,7 @@ class Photo:
 
 def _photo_ok(an: Analysis, t: float, pinned: dict[str, list[Note]]) -> bool:
     """A photo at t must not crowd any hand-pinned note in any difficulty."""
-    ph = Note(t, PHOTO, pinned=True)
+    ph = Note(t, PHOTO, pinned=True, final=all(n.end() <= t for ns in pinned.values() for n in ns))
     for diff, notes in pinned.items():
         for n in notes:
             a, b = (n, ph) if n.t <= t else (ph, n)
@@ -779,8 +783,14 @@ def choose_photos(an: Analysis, ov: dict, pinned: dict[str, list[Note]], warn=pr
     "pose"), the rest auto-placed on downbeats at drops / section ends, spread across the play window."""
     photos = []
     for p in ov.get("photos", []):
-        t = float(p["t"])           # pinned photos snap to the nearest beat (or downbeat with "snap": "downbeat")
-        t = bar_time(an, bar_index(an, t)) if p.get("snap") == "downbeat" else an.snap(t, 1.0)
+        t = float(p["t"])           # pinned photos snap to the nearest beat ("snap": "downbeat" | "half" | false)
+        snap = p.get("snap", "beat")
+        if snap == "downbeat":
+            t = bar_time(an, bar_index(an, t))
+        elif snap == "half":
+            t = an.snap(t, 0.5)
+        elif snap is not False:
+            t = an.snap(t, 1.0)
         if not _photo_ok(an, t, pinned):
             warn(f"  ! photo pinned at {t:.3f} crowds a pinned note (needs {PHOTO_FREE_BEFORE:g} beats before, "
                  f"{PHOTO_FREE_AFTER:g} after)")
@@ -848,6 +858,9 @@ def build_charts(an: Analysis, song_id: str, ov: dict, log=print,
         gen = choreograph(an, diff, seed, no_notes)
         merged = apply_overrides(an, gen, ov, diff)
         merged += [Note(p.t, PHOTO, pinned=True) for p in (photos or [])]
+        last = max(merged, key=lambda n: n.end(), default=None)
+        if last is not None and last.move == PHOTO:
+            last.final = True
         charts[diff] = enforce(merged, an, diff, warn=log)
     return charts
 
@@ -1008,13 +1021,16 @@ ENERGY_THRESHOLDS = (1.0, 1.35)   # difficulty score -> 1 / 2 / 3 pips
 
 def difficulty_score(an: Analysis, notes: list[Note]) -> float:
     """Physical load per second: each move weighs by kind (splits/sweeps cost more) and counts double
-    when it follows the previous move within ~1 beat (fast changes). Photos are free."""
+    when it follows the previous move within ~1 beat (fast changes; clap->clap clapping along excluded).
+    Photos are free."""
     ms = [n for n in notes if n.move != PHOTO]
     if len(ms) < 2:
         return 0.0
     span = max(1.0, ms[-1].t - ms[0].t)
     load = sum(MOVE_WEIGHT[n.move] for n in ms)
     for a, b in zip(ms, ms[1:]):
+        if a.move == "clap" and b.move == "clap":
+            continue                  # clapping along: no pose change
         if b.t - a.end() < 1.05 * an.local_period(b.t):
             load += MOVE_WEIGHT[b.move]
     return load / span
@@ -1057,7 +1073,8 @@ def main(argv=None):
     ap.add_argument("song", help="audio file (mp3). May already be public/songs/<id>/audio.mp3")
     ap.add_argument("--id", required=True, help="song id (folder name, also seeds the generator)")
     ap.add_argument("--title")
-    ap.add_argument("--artist")
+    ap.add_argument("--artist", help="artist shown in song select (never taken from the file's tags; "
+                                     "or set \"artist\" in overrides.json to keep it across re-imports)")
     ap.add_argument("--public", default=None, help="public/ dir (default: <repo>/public)")
     ap.add_argument("--force", action="store_true", help="overwrite an existing different audio.mp3")
     ap.add_argument("--no-index", action="store_true", help="do not touch public/songs/index.json")
@@ -1126,9 +1143,9 @@ def main(argv=None):
 
     moves = [m for m in MOVES if any(n.move == m for n in notes)]
     title = args.title or meta["title"] or song_id.replace("-", " ").title()
-    artist = args.artist or meta["artist"] or "Unknown"
+    artist = args.artist or ov.get("artist")    # explicit only: ID3 artist tags are NOT copied (often an account name)
     entry = {
-        "id": song_id, "title": title, "artist": artist,
+        "id": song_id, "title": title,
         "audio": f"songs/{song_id}/audio.mp3", "cover": f"songs/{song_id}/cover.jpg",
         "bpm": round(an.bpm, 2), "duration": round(an.duration, 2),
         "energy": int(ov["energy"]) if "energy" in ov else song_energy(an, notes),
@@ -1137,11 +1154,14 @@ def main(argv=None):
         "preview": preview,
         "chart": f"songs/{song_id}/chart.json",
     }
+    if artist:
+        entry = {**{k: entry[k] for k in ("id", "title")}, "artist": artist,
+                 **{k: v for k, v in entry.items() if k not in ("id", "title")}}
     if not args.no_index:
         upsert_index(public / "songs" / "index.json", entry)
 
     # ---- report ----
-    log(f"\n{title} — {artist}  ({fmt_t(an.duration)})")
+    log(f"\n{title}{' — ' + artist if artist else ''}  ({fmt_t(an.duration)})")
     log(f"bpm {an.bpm:.2f}  beat {an.period*1000:.1f} ms  first downbeat (offset) {an.offset:.3f}s  "
         f"play window {an.play_start:.2f}-{an.play_end:.2f}s  energy {entry['energy']} "
         f"(difficulty score {difficulty_score(an, notes):.2f} -> {song_energy(an, notes)} pips"

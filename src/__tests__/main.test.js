@@ -6,7 +6,7 @@ vi.mock('../engine/stage.js',()=>({createStage:options=>{
 }}));
 vi.mock('../hud/menu.js',()=>({
   $:id=>env.nodes.get(id),fmtTime:s=>`${Math.floor(s/60)}:${String(Math.floor(s%60)).padStart(2,'0')}`,
-  createWallPainter:()=>()=>{},createMenuHUD:()=>({render:vi.fn(),flash:vi.fn()}),
+  createWallPainter:()=>()=>{},createMenuHUD:()=>env.menu=({render:vi.fn(),flash:vi.fn()}),
 }));
 vi.mock('../hud/gameplay.js',()=>({createGameplayHUD:()=>({setSong:vi.fn(),judgement:vi.fn(),update:vi.fn()})}));
 vi.mock('../hud/results.js',()=>({createResultsHUD:(_board,{onContinue})=>env.results={show:vi.fn(),setShots:vi.fn(),hide:vi.fn(),activity:vi.fn(),tick:vi.fn(),setBackProgress:vi.fn(),keydown:vi.fn(),primary:vi.fn(),leave:vi.fn(onContinue),movesBlocked:()=>document.activeElement?.tagName==='INPUT'&&!!document.activeElement.value}}));
@@ -18,7 +18,7 @@ vi.mock('../audio.js',()=>({createAudioPlayer:({muted})=>{
     unlock:vi.fn(async()=>{env.suspended=false;}),load:vi.fn(async()=>{if(env.failLoad)throw Error('missing audio');return env.duration;}),
     play:vi.fn(({silentClock})=>{api.silent=silentClock;api.running=true;env.elapsed=0;}),
     pause:vi.fn(()=>{api.running=false;}),resume:vi.fn(async()=>{api.running=true;}),stop:vi.fn(()=>{api.running=false;env.elapsed=0;}),cancelLoad:vi.fn(),
-    setVolumes:vi.fn(),contextTimeForSong:t=>t,playbackTime:()=>env.elapsed,songTime:()=>env.elapsed-api.calibrationMs/1000,perfToSongTime:t=>env.elapsed-api.calibrationMs/1000+(t-env.now)/1000,
+    getBuffer:vi.fn(async()=>({duration:4.8,numberOfChannels:1,getChannelData:()=>new Float32Array([.1,-.1])})),musicLevel:()=>.1,setVolumes:vi.fn(),contextTimeForSong:t=>t,playbackTime:()=>env.elapsed,songTime:()=>env.elapsed-api.calibrationMs/1000,perfToSongTime:t=>env.elapsed-api.calibrationMs/1000+(t-env.now)/1000,
   };return env.audio=api;
 }}));
 vi.mock('../camera.js',()=>({CAMERA_COPY:{avatar:['avatar','',''],live:['live','','']},createCamera:options=>{
@@ -36,8 +36,9 @@ async function boot({query='?state=play&mute&offline&demo',bests={},calibration=
   vi.stubGlobal('location',{search:query});await import('../main.js');await settle();
   return window.wh;
 }
-function event(type,code){env.events[type]({code,target:{tagName:'BODY'},preventDefault(){},repeat:false});}
+function event(type,code,repeat=false){env.events[type]({code,target:{tagName:'BODY'},preventDefault(){},repeat});}
 function tick(t){env.now=t*1000;env.elapsed=t;if(env.frame)env.frame.t=env.now;env.tick({},1/60,env.now);}
+function advance(start,end,step=.02){for(let ms=Math.round(start*1000);ms<=Math.round(end*1000);ms+=Math.round(step*1000))tick(ms/1000);}
 function pose(scores={}) {return {t:env.now,source:'camera',tracked:true,upperBody:true,scores:{up:0,down:0,clap:0,split_lu:0,split_ld:0,overhead:0,low:0,...scores},arms:null,landmarks:null,armAngle:{left:0,right:0},elbowStraight:{left:1,right:1},energy:0};}
 beforeEach(()=>{
   vi.resetModules();env.nodes=new Map(ids.map(id=>[id,node()]));env.events={};env.storage=new Map();env.now=env.elapsed=0;env.duration=5;env.suspended=false;env.failLoad=false;env.frame=null;env.notes=[{t:1,move:'up'}];
@@ -50,14 +51,30 @@ beforeEach(()=>{
 afterEach(()=>{vi.restoreAllMocks();vi.unstubAllGlobals();});
 
 describe('game integration audit regressions',()=>{
+  it('enters the results cheer once and leaves it when returning to songs',async()=>{const app=await boot();tick(5);expect(app.state).toBe('results');expect(app.cheer.counts.entered).toBe(1);tick(5.1);expect(app.cheer.counts.entered).toBe(1);env.results.leave();expect(app.state).toBe('songs');expect(env.audio.getBuffer).toHaveBeenCalledExactlyOnceWith('sfx/stadium-cheer.mp3');});
+  it('keeps exactly one shared photo shutter trigger in a versus run',async()=>{
+    env.notes=[{t:1,move:'up'},{t:2,move:'photo'}];
+    const app=await boot({query:'?state=play&players=2&mute&offline&demo'});
+    for(const time of [.6,1,1.5,2,2.1,2.5])tick(time);
+    expect(app.sfx.counts.shutter.attempted).toBe(1);
+    expect(app.photoNotes[0].photoTaken).toBe(true);
+  });
   it('returns to the title after a camera LEFT UP hold and consumes the held edge',async()=>{
     const app=await boot({query:'?state=songs&players=2&mute&offline&demo'});await env.camera.enable();
     env.frame=pose({split_lu:1});tick(.1);expect(app.state).toBe('songs');
-    tick(.7);expect(env.nodes.get('backFill').style.strokeDasharray).toBe('50 100');
-    tick(1.31);expect(app.state).toBe('title');env.nodes.get('twoPlayers').handlers.click();tick(1.4);expect(app.players).toHaveLength(2);
+    advance(.12,.82);expect(env.nodes.get('backFill').style.strokeDasharray).toBe('50 100');
+    advance(.84,1.44);expect(app.state).toBe('title');env.nodes.get('twoPlayers').handlers.click();tick(1.4);expect(app.players).toHaveLength(2);
   });
   it('composites one live camera behind title and song text, preserving fallback and gameplay',async()=>{const app=await boot({query:'?mute&offline&demo'});expect(env.stage.setMenuCamera).toHaveBeenLastCalledWith(false);await env.camera.enable();expect(env.stage.setVideo).toHaveBeenCalledTimes(1);expect(env.stage.setMenuCamera).toHaveBeenLastCalledWith(true);expect(env.stage.setWall).toHaveBeenLastCalledWith('cam');env.nodes.get('titleStart').handlers.click();expect(app.state).toBe('tutorial');expect(env.stage.setMenuCamera).toHaveBeenLastCalledWith(false);});
-  it('routes a held results LEFT UP through the shared leave action',async()=>{const app=await boot();await env.camera.enable();tick(5);env.frame=pose({split_lu:1});tick(5.1);tick(5.7);expect(env.results.setBackProgress).toHaveBeenLastCalledWith(.5);tick(6.31);expect(env.results.leave).toHaveBeenCalledTimes(1);expect(app.state).toBe('songs');});
+  it.each(['title','songs'])('routes the %s wall to a painted canvas without a camera, and to the menu composite when live',async state=>{
+    await boot({query:`?state=${state}&mute&offline&demo`});
+    expect(env.stage.setWall).toHaveBeenLastCalledWith('canvas');
+    expect(env.stage.setMenuCamera).toHaveBeenLastCalledWith(false);
+    await env.camera.enable();
+    expect(env.stage.setWall).toHaveBeenLastCalledWith('cam');
+    expect(env.stage.setMenuCamera).toHaveBeenLastCalledWith(true);
+  });
+  it('routes a held results LEFT UP through the shared leave action',async()=>{const app=await boot();await env.camera.enable();tick(5);env.frame=pose({split_lu:1});advance(5.1,5.82);expect(env.results.setBackProgress).toHaveBeenLastCalledWith(.5);advance(5.84,6.44);expect(env.results.leave).toHaveBeenCalledTimes(1);expect(app.state).toBe('songs');});
   it('uses clickable title choices and a clap button without any keyboard option',async()=>{
     const app=await boot({query:'?mute&offline&demo'});
     env.nodes.get('twoPlayers').handlers.click();expect(app.players).toHaveLength(2);
@@ -109,7 +126,7 @@ describe('game integration audit regressions',()=>{
   });
   it('allows camera LEFT UP to cancel countdown (#8)',async()=>{
     env.suspended=true;const app=await boot();await env.nodes.get('startBtn').handlers.click();expect(app.state).toBe('count');
-    await env.camera.enable();env.frame=pose({split_lu:1});tick(0.1);expect(app.state).toBe('songs');env.frame.scores.split_lu=0;tick(5);expect(app.state).toBe('songs');expect(env.audio.running).toBe(false);
+    await env.camera.enable();env.frame=pose({split_lu:1});advance(.1,.24);expect(app.state).toBe('songs');env.frame.scores.split_lu=0;tick(5);expect(app.state).toBe('songs');expect(env.audio.running).toBe(false);
   });
   it('explicitly chooses silent mode after load failure even if an old duration exists (#9)',async()=>{
     env.failLoad=true;const app=await boot();expect(env.nodes.get('startBtn').textContent).toBe('Start with silent audio');
@@ -146,9 +163,70 @@ describe('game integration audit regressions',()=>{
   });
   it('suppresses pose menu actions while entering a results name and consumes held edges',async()=>{
     const app=await boot();await env.camera.enable();tick(5);expect(app.state).toBe('results');
-    document.activeElement={tagName:'INPUT',value:'Kai'};env.frame=pose({clap:1});tick(5.1);expect(app.state).toBe('results');
-    document.activeElement=undefined;tick(5.2);expect(app.state).toBe('results');
-    expect(env.results.primary).not.toHaveBeenCalled();env.frame.scores.clap=0;tick(5.3);env.frame.scores.clap=1;tick(5.6);expect(app.state).toBe('results');expect(env.results.primary).toHaveBeenCalledTimes(1);
+    document.activeElement={tagName:'INPUT',value:'Kai'};env.frame=pose({clap:1});advance(5.1,5.24);expect(app.state).toBe('results');
+    document.activeElement=undefined;tick(5.3);expect(app.state).toBe('results');
+    expect(env.results.primary).not.toHaveBeenCalled();env.frame.scores.clap=0;advance(5.4,5.9);env.frame.scores.clap=1;advance(6,6.14);expect(app.state).toBe('results');expect(env.results.primary).toHaveBeenCalledTimes(1);
   });
 
+});
+
+
+describe('menu activation integration',()=>{
+  it('updates the tracker once per rAF, ignores duplicate captures, and never routes P2 in 1P',async()=>{
+    await boot({query:'?state=songs&mute&offline&demo'});
+    const tracker={updateAll:vi.fn(()=>[env.frame,{...pose({split_ld:1}),t:env.now,source:'camera:1',player:1}]),update:vi.fn(),close:vi.fn(),setMaxPlayers:vi.fn()};
+    env.trackerFactory=async()=>tracker;await env.camera.enable();env.frame=pose({split_ld:1});env.frame.t=0;
+    for(let i=0;i<60;i++){env.now=i*1000/60;env.tick({},1/60,env.now);}
+    expect(tracker.updateAll).toHaveBeenCalledTimes(60);expect(tracker.update).not.toHaveBeenCalled();
+    expect(window.wh.players[0].menu.debug()).toMatchObject({processed:1,duplicates:59,confirmMs:0});expect(env.menu.flash).not.toHaveBeenCalled();
+    advance(1,1.14);expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_ld')).toHaveLength(1);
+  });
+  it('holds the camera latch through dropout → re-acquire and a different transition move',async()=>{
+    await boot({query:'?state=songs&mute&offline&demo'});await env.camera.enable();env.frame=pose({split_ld:.8});advance(0,.2);
+    env.frame.tracked=false;advance(.22,.8);env.frame.tracked=true;env.frame.scores={clap:.9,split_ld:0};advance(.82,.9);
+    env.frame.scores={split_ld:.8};advance(.92,2);
+    expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_ld')).toHaveLength(1);expect(env.menu.flash.mock.calls.filter(([move])=>move==='clap')).toHaveLength(0);
+  });
+  it('pauses a Back fill during lost tracking, and never counts the lost interval',async()=>{
+    const app=await boot({query:'?state=songs&mute&offline&demo'});await env.camera.enable();env.frame=pose({split_lu:1});advance(.1,.82);
+    expect(env.nodes.get('backFill').style.strokeDasharray).toBe('50 100');env.frame.tracked=false;advance(.84,2);
+    expect(env.nodes.get('backFill').style.strokeDasharray).toBe('50 100');expect(app.state).toBe('songs');env.frame.tracked=true;advance(2.02,2.6);expect(app.state).toBe('songs');
+    advance(2.62,2.64);expect(app.state).toBe('title');expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_lu')).toHaveLength(1);
+  });
+
+  it('fires song next only once through five seconds of a noisy held RIGHT UP',async()=>{
+    await boot({query:'?state=songs&mute&offline&demo'});await env.camera.enable();env.frame=pose({split_ld:1});
+    for(let i=0;i<=250;i++){env.frame.scores.split_ld=i%5===0?.6:1;tick(i/50);}
+    expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_ld')).toHaveLength(1);
+    env.frame.scores.split_ld=0;advance(5.1,5.6);env.frame.scores.split_ld=1;advance(5.7,5.84);
+    expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_ld')).toHaveLength(2);
+  });
+  it('fires previous once before the deliberate Back hold and never repeats it on title',async()=>{
+    const app=await boot({query:'?state=songs&players=2&mute&offline&demo'});await env.camera.enable();env.frame=pose({split_lu:1});
+    advance(.1,.82);expect(env.nodes.get('backFill').style.strokeDasharray).toBe('50 100');advance(.84,1.44);expect(app.state).toBe('title');
+    env.nodes.get('twoPlayers').handlers.click();for(let i=70;i<250;i++)tick(i/50);
+    expect(app.players).toHaveLength(2);expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_lu')).toHaveLength(1);expect(env.menu.flash.mock.calls.filter(([move])=>move==='back')).toHaveLength(1);
+  });
+  it('consumes a results Back hold across results → songs rather than cascading to title',async()=>{
+    const app=await boot();await env.camera.enable();tick(5);env.frame=pose({split_lu:1});advance(5.1,6.44);expect(app.state).toBe('songs');
+    for(let i=320;i<550;i++)tick(i/50);expect(env.results.leave).toHaveBeenCalledTimes(1);expect(app.state).toBe('songs');
+  });
+  it('each player can activate the same move once without a shared cooldown',async()=>{
+    await boot({query:'?state=songs&players=2&mute&offline&demo'});let second=null;env.trackerFactory=async()=>({updateAll:()=>[env.frame,second],setMaxPlayers:vi.fn(),close:vi.fn()});await env.camera.enable();
+    env.frame=pose({split_ld:1});advance(.1,.24);second={...pose({split_ld:1}),source:'camera:1',player:1};for(let t=.26;t<=.5;t+=.02){second.t=t*1000;tick(t);}
+    expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_ld')).toHaveLength(2);
+  });
+  it('tutorial and results clap shortcuts latch until release',async()=>{
+    await boot({query:'?state=tutorial&mute&offline&demo'});await env.camera.enable();env.frame=pose({clap:1});for(let i=0;i<250;i++)tick(i/50);
+    expect(env.menu.flash.mock.calls.filter(([move])=>move==='clap')).toHaveLength(1);
+  });
+  it('a held results clap invokes the primary action only once',async()=>{
+    const app=await boot();await env.camera.enable();tick(5);env.frame=pose({clap:1});for(let i=251;i<500;i++)tick(i/50);
+    expect(app.state).toBe('results');expect(env.results.primary).toHaveBeenCalledTimes(1);
+  });
+  it('ignores keyboard autorepeat and the synthetic pose echo, but accepts a new keydown',async()=>{
+    await boot({query:'?state=songs&mute&offline&demo'});event('keydown','ArrowDown');for(let i=0;i<200;i++){event('keydown','ArrowDown',true);tick(i/50);}
+    expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_ld')).toHaveLength(1);
+    event('keyup','ArrowDown');tick(4.1);event('keydown','ArrowDown');tick(4.2);expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_ld')).toHaveLength(2);
+  });
 });

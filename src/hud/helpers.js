@@ -12,7 +12,7 @@ export function popJudge(layer, j, x, y) {
   el.style.left = typeof x === 'number' ? x + 'px' : x;
   el.style.top = typeof y === 'number' ? y + 'px' : y;
   layer.appendChild(el);
-  setTimeout(() => el.remove(), 720);
+  el.addEventListener('animationend', () => el.remove(), {once:true});
 }
 export function starsHTML(n) {
   return [0, 1, 2].map(i => `<i class="${i < n ? 'on' : ''}">${iconSVG('star')}</i>`).join('');

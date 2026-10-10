@@ -5,8 +5,8 @@ export const MOVES = {
   down: { id: 'down', lane: 1, label: 'ARMS DOWN', cue: 'Elbows 90°, hands down', key: '2', alias: '↓',     c: P.down },
   clap: { id: 'clap', lane: 2, label: 'CLAP',      cue: 'Clap in front of chest', key: '3', alias: 'Space', c: P.clap },
 };
-MOVES.split_lu = { id: 'split_lu', lane: 3, label: 'LEFT UP', cue: 'Left up, right down', key: '4', c: P.split_lu };
-MOVES.split_ld = { id: 'split_ld', lane: 4, label: 'LEFT DOWN', cue: 'Left down, right up', key: '5', c: P.split_ld };
+MOVES.split_lu = { id: 'split_lu', lane: 3, label: 'LEFT UP', cue: 'Left forearm up, right forearm down', key: '4', c: P.split_lu };
+MOVES.split_ld = { id: 'split_ld', lane: 4, label: 'RIGHT UP', cue: 'Right forearm up, left forearm down', key: '5', c: P.split_ld };
 MOVES.sweep = { id: 'sweep', lane: 5, label: 'SWEEP', cue: 'SWEEP: arms up high, then down the sides', key: '6', c: P.sweep };
 export const MOVE_IDS = Object.keys(MOVES);
 export const PHOTO = {id:'photo',label:'PHOTO!',cue:'PHOTO: strike any pose when the camera flashes',c:P.fg};

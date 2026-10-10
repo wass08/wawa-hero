@@ -1,15 +1,17 @@
+import { createMusicDuck } from './music-duck.js';
 // Buffer transport and heard playback account for output-device latency.
 export function createAudioPlayer({ muted = false, musicVolume = 0.8, sfxVolume = 0.7 } = {}) {
-  let ctx, masterGain, musicBus, sfxBus, buffer, source, previewVoice, startCtx = 0, position = 0, heardPosition = 0, running = false;
+  let ctx, masterGain, musicBus, sfxBus, musicDuck, buffer, source, previewVoice, startCtx = 0, position = 0, heardPosition = 0, running = false;
   const buffers = new Map();
   const previewVoices = new Set();
-  let silent = false, silentAnchor = 0, loadGeneration = 0, playGeneration = 0;
+  let silent = false, silentAnchor = 0, loadGeneration = 0, playGeneration = 0, sfxEnabled = true;
   const context = () => {
     if (!ctx) {
       ctx = new AudioContext(); masterGain = ctx.createGain();
       masterGain.gain.value = muted ? 0 : 1; masterGain.connect(ctx.destination);
       musicBus = ctx.createGain(); musicBus.gain.value = musicVolume; musicBus.connect(masterGain);
-      sfxBus = ctx.createGain(); sfxBus.gain.value = sfxVolume; sfxBus.connect(masterGain);
+      musicDuck = createMusicDuck(ctx,musicBus.gain,()=>musicVolume);
+      sfxBus = ctx.createGain(); sfxBus.gain.value = sfxEnabled ? sfxVolume : 0; sfxBus.connect(masterGain);
     }
     return ctx;
   };
@@ -26,9 +28,14 @@ export function createAudioPlayer({ muted = false, musicVolume = 0.8, sfxVolume 
     get muted() { return muted; }, get suspended() { return !ctx || ctx.state !== 'running'; },
     get duration() { return buffer?.duration || 0; }, get running() { return running; }, get silent() { return silent; },
     get musicVolume() { return musicVolume; }, get sfxVolume() { return sfxVolume; },
+    get sfxEnabled() { return sfxEnabled; },
+    setSfxEnabled(value) { sfxEnabled = !!value; if (ctx) { sfxBus.gain.cancelScheduledValues(ctx.currentTime); sfxBus.gain.value = sfxEnabled ? sfxVolume : 0; if(!sfxEnabled)musicDuck.reset(); } },
+    duckMusic(options) { if(sfxEnabled)musicDuck?.trigger(options); },
+    resetMusicDuck() { musicDuck?.reset(); },
+    musicDuckGain() { return musicDuck?.gainAt(ctx.currentTime)??1; },
     setVolumes(music, effects) {
       musicVolume = Math.min(1, Math.max(0, music)); sfxVolume = Math.min(1, Math.max(0, effects));
-      if (ctx) { setGain(musicBus.gain, musicVolume, ctx.currentTime); setGain(sfxBus.gain, sfxVolume, ctx.currentTime); }
+      if (ctx) { musicDuck.reset(); setGain(sfxBus.gain, sfxEnabled ? sfxVolume : 0, ctx.currentTime); }
     },
     async unlock() { const c = context(); await c.resume(); return c.state === 'running'; },
     async getBuffer(url) {
@@ -88,19 +95,22 @@ export function createAudioPlayer({ muted = false, musicVolume = 0.8, sfxVolume 
       startSource(); return true;
     },
     pause() {
+      this.resetMusicDuck();
       playGeneration++; // Invalidate an asynchronous resume even if it has not started yet.
       if (!running) return;
       heardPosition = rawTime(); position = transportTime();
       halt(); running = false;
     },
     async resume() {
+      this.resetMusicDuck();
       if (running) return;
       if (silent) { silentAnchor = performance.now(); running = true; return; }
       const generation = playGeneration;
       await this.unlock(); if (generation === playGeneration && buffer) startSource();
     },
-    stop() { playGeneration++; halt(); running = false; position = heardPosition = 0; },
+    stop() { this.resetMusicDuck(); playGeneration++; halt(); running = false; position = heardPosition = 0; },
     seek(seconds) {
+      this.resetMusicDuck();
       const wasRunning = running;
       halt(); position = Math.max(0, Math.min(buffer?.duration || Infinity, seconds));
       heardPosition = position - (silent ? 0 : ctx?.outputLatency || 0);

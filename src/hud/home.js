@@ -1,15 +1,16 @@
+import {createPolaroidTexture} from './polaroid.js';
 // The home wall celebrates people; ranks appear only after posting a result.
 export function createHomeHUD(board) {
   const wall=document.getElementById?.('playerWall'),gallery=document.getElementById?.('wallGallery');
   if(!wall||!gallery)return {refresh(){},tick(){}};
-  let entries=[],loading=false,lastCycle=-1,loadedAt=-Infinity;
+  let entries=[],loading=false,lastCycle=-1,loadedAt=-Infinity,textures=[];
   function paintWall(cycle) {
-    gallery.hidden=!entries.length;wall.replaceChildren();
+    gallery.hidden=!entries.length;for(const texture of textures)texture.close();textures=[];wall.replaceChildren();
     for(let i=0;i<Math.min(4,entries.length);i++) {
       const row=entries[(cycle*4+i)%entries.length],tile=document.createElement('figure');tile.className='polaroid';
-      const img=document.createElement('img');img.alt=`${row.player_name} on stage`;img.src=board.shotUrl(row.shots[0]);
-      const name=document.createElement('figcaption');name.append(board.flagElement(row.country),document.createTextNode(' '+row.player_name));
-      tile.append(img,name);wall.append(tile);
+      const texture=createPolaroidTexture(row,{photoUrl:board.shotUrl(row.shots[0]),loadFlagImage:board.loadFlagImage});textures.push(texture);
+      texture.canvas.setAttribute('role','img');texture.canvas.setAttribute('aria-label',`${row.player_name} · ${Number(row.score).toLocaleString('en-US')} points${row.mode==='versus'?' · two players':''}`);
+      tile.append(texture.canvas);wall.append(tile);
     }
   }
   return {

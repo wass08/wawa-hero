@@ -3,7 +3,6 @@
   {
    "id": "arms-up-arms-down",
    "title": "Arms Up, Arms Down",
-   "artist": "arabesquestreamingservice023",
    "audio": "songs/arms-up-arms-down/audio.mp3",
    "cover": "songs/arms-up-arms-down/cover.jpg",
    "bpm": 137.18,
@@ -25,7 +24,6 @@
   {
    "id": "wawa-hero",
    "title": "Wawa Hero",
-   "artist": "arabesquestreamingservice023",
    "audio": "songs/wawa-hero/audio.mp3",
    "cover": "songs/wawa-hero/cover.jpg",
    "bpm": 124.71,
@@ -49,7 +47,6 @@
   {
    "id": "system-online",
    "title": "System Online",
-   "artist": "arabesquestreamingservice023",
    "audio": "songs/system-online/audio.mp3",
    "cover": "songs/system-online/cover.jpg",
    "bpm": 126.0,

@@ -1,3 +1,6 @@
+import {loadGameFonts,drawNumeralText} from '../typography.js';
+import {createFlags} from '../services/flags.js';
+const stripFlags=createFlags();
 // Weighted interval selection: maximise quality, at most four, ≥15s apart.
 export function selectHeroShots(candidates,limit=4,gap=15) {
   const shots=candidates.filter(s=>Number.isFinite(s.t)&&s.blob).slice().sort((a,b)=>a.t-b.t);
@@ -12,23 +15,24 @@ export function stripLayout(count=4,width=720) {
   const margin=24,gap=14,photoWidth=width-2*margin,photoHeight=Math.round(photoWidth*9/16),header=174,footer=90;
   return {width,height:header+count*(photoHeight+gap)+footer,header,footer,shots:Array.from({length:count},(_,i)=>({x:margin,y:header+i*(photoHeight+gap),w:photoWidth,h:photoHeight}))};
 }
-function loadFlag(src){return new Promise((resolve,reject)=>{const image=new Image();image.onload=()=>resolve(image);image.onerror=reject;image.src=src;});}
 function drawStar(ctx,x,y,fill){ctx.fillStyle=fill;ctx.beginPath();for(let i=0;i<10;i++){const r=i%2?4:10,a=-Math.PI/2+i*Math.PI/5;const xx=x+Math.cos(a)*r,yy=y+Math.sin(a)*r;i?ctx.lineTo(xx,yy):ctx.moveTo(xx,yy);}ctx.closePath();ctx.fill();}
 export const canvasBlob = (canvas,quality=.8) => new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(Error('Photo export failed')),'image/webp',quality));
-export async function renderStrip(shots,{name,flagUrl='',score,kcal,stars=0,song='',date=new Date()}={}) {
+export async function renderStrip(shots,{name,country=null,score,kcal,stars=0,song='',date=new Date()}={}) {
+  await loadGameFonts();
   const layout=stripLayout(4),canvas=document.createElement('canvas');canvas.width=layout.width;canvas.height=layout.height;
   const ctx=canvas.getContext('2d');ctx.fillStyle='#120b28';ctx.fillRect(0,0,canvas.width,canvas.height);
-  ctx.fillStyle='#f7f4ff';ctx.font='700 54px "Pixelify Sans", monospace';ctx.fillText('WAWA HERO',24,62);
-  ctx.font='20px "Rubik", sans-serif';ctx.fillStyle='#36ddf1';if(flagUrl){const flag=await loadFlag(flagUrl);ctx.drawImage(flag,24,77,27,20);}
-  ctx.fillText(`${name||'Player'} · ${Number(score||0).toLocaleString()} points`,flagUrl?60:24,94);
-  ctx.fillStyle='#bcb0d1';ctx.font='20px "Rubik", sans-serif';ctx.fillText(song,24,127);
+  ctx.fillStyle='#f7f4ff';ctx.font='700 54px "Chakra Petch", system-ui, sans-serif';ctx.fillText('WAWA HERO',24,62);
+  const flag=await stripFlags.image(country);
+  ctx.font='20px "Chakra Petch",system-ui,sans-serif';ctx.fillStyle='#36ddf1';if(flag)ctx.drawImage(flag,24,76,32,24);
+  drawNumeralText(ctx,`${name||'Player'} · ${Number(score||0).toLocaleString()} points`,flag?68:24,94);
+  ctx.fillStyle='#bcb0d1';ctx.font='20px "Chakra Petch",system-ui,sans-serif';ctx.fillText(song,24,127);
   for(let i=0;i<3;i++)drawStar(ctx,34+i*26,149,i<stars?'#ffd532':'#453454');
   for(let i=0;i<4;i++) {const r=layout.shots[i],shot=shots[i];ctx.fillStyle='#312046';ctx.fillRect(r.x,r.y,r.w,r.h);
     if(shot?.blob) {const bitmap=await createImageBitmap(shot.blob);ctx.drawImage(bitmap,r.x,r.y,r.w,r.h);bitmap.close();}
-    else {ctx.fillStyle='#917bba';ctx.font='700 32px "Pixelify Sans", monospace';ctx.fillText('YOUR NEXT HERO MOMENT',r.x+28,r.y+r.h/2);}
+    else {ctx.fillStyle='#917bba';ctx.font='700 32px "Chakra Petch", system-ui, sans-serif';ctx.fillText('YOUR NEXT HERO MOMENT',r.x+28,r.y+r.h/2);}
     ctx.strokeStyle=i%2?'#df368b':'#36ddf1';ctx.lineWidth=4;ctx.strokeRect(r.x,r.y,r.w,r.h);}
-  ctx.font='22px "Rubik", sans-serif';ctx.fillStyle='#f7f4ff';ctx.fillText(`${Number(kcal||0).toFixed(1)} kcal · ${date.toLocaleDateString()}`,24,canvas.height-44);
-  ctx.font='17px "JetBrains Mono", monospace';ctx.fillStyle='#bcb0d1';ctx.fillText('ARMS UP. MUSIC ON. YOU ARE THE HERO.',24,canvas.height-16);
+  ctx.font='22px "Chakra Petch",system-ui,sans-serif';ctx.fillStyle='#f7f4ff';drawNumeralText(ctx,`${Number(kcal||0).toFixed(1)} kcal · ${date.toLocaleDateString()}`,24,canvas.height-44);
+  ctx.font='17px "Chakra Petch",system-ui,sans-serif';ctx.fillStyle='#bcb0d1';ctx.fillText('ARMS UP. MUSIC ON. YOU ARE THE HERO.',24,canvas.height-16);
   return canvasBlob(canvas,.85);
 }
 export function selectRunShots(cueShots,candidates) {

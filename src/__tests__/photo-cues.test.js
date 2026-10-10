@@ -40,18 +40,18 @@ describe('free photo cues',()=>{
   });
 });
 describe('photo export and posting integration',()=>{
-  it('uses the backend SVG badge when flag emojis are unsupported',async()=>{
-    vi.stubGlobal('document',{createElement:tag=>({tag})});const board=await createBoardClient(new URLSearchParams('?fakeboard'),{countryLoader:async()=>({...countryData,emojiFlagsSupported:()=>false})});const flag=board.flagElement('JP');expect(flag.tag).toBe('img');expect(flag.src).toMatch(/^data:image\/svg\+xml/);expect(flag.alt).toBe('JP');expect(board.flag('JP')).toBe('JP');
+  it('uses real SVG flags even when flag emojis are unsupported',async()=>{
+    vi.stubGlobal('document',{createElement:tag=>({tag})});const board=await createBoardClient(new URLSearchParams('?fakeboard'),{countryLoader:async()=>({...countryData,emojiFlagsSupported:()=>false})});const flag=board.flagElement('JP');expect(flag.tag).toBe('img');expect(flag.src).toBe(countryData.flagUrl('JP'));expect(flag.alt).toBe('Japan');expect(board.flag('JP')).toBe('JP');
   });
   it('retains Safari PNG blobs for download while blocking photo uploads',async()=>{
     const png=blob('image/png'),canvas={toBlob:vi.fn(callback=>callback(png))};expect(await canvasBlob(canvas)).toBe(png);expect(canvas.toBlob).toHaveBeenCalledWith(expect.any(Function),'image/webp',.8);expect(imageExtension(png)).toBe('png');expect(photoUploadAllowed([{realCamera:true,blob:png}])).toBe(false);expect(photoUploadAllowed([{realCamera:true,blob:blob()}])).toBe(true);expect(photoUploadAllowed([{realCamera:false,blob:blob()}])).toBe(false);
   });
   it('includes song, stars and an SVG flag in the downloadable strip',async()=>{
-    const ctx=Object.fromEntries(['fillRect','fillText','drawImage','strokeRect','beginPath','moveTo','lineTo','closePath','fill'].map(k=>[k,vi.fn()]));const canvas={getContext:()=>ctx,toBlob:callback=>callback(blob())};vi.stubGlobal('document',{createElement:()=>canvas});
+    const ctx=Object.fromEntries(['fillRect','fillText','drawImage','strokeRect','beginPath','moveTo','lineTo','closePath','fill'].map(k=>[k,vi.fn()]));ctx.measureText=text=>({width:text.length*10});const canvas={getContext:()=>ctx,toBlob:callback=>callback(blob())};vi.stubGlobal('document',{createElement:()=>canvas});
     vi.stubGlobal('Image',class{set src(value){this.url=value;queueMicrotask(()=>this.onload());}});
     const shots=[1,2,3,4].map(t=>({t,blob:blob()}));vi.stubGlobal('createImageBitmap',vi.fn(async()=>({close:vi.fn()})));
-    const strip=await renderStrip(shots,{name:'Pixel',flagUrl:'data:image/svg+xml,flag',song:'System Online',score:4200,stars:2,kcal:12.8,date:new Date('2026-10-10')});
-    expect(strip.type).toBe('image/webp');expect(ctx.fillText.mock.calls.map(c=>c[0])).toContain('System Online');expect(ctx.fill).toHaveBeenCalledTimes(3);expect(ctx.drawImage).toHaveBeenCalledTimes(5);
+    const strip=await renderStrip(shots,{name:'Pixel',country:'FR',song:'System Online',score:4200,stars:2,kcal:12.8,date:new Date('2026-10-10')});
+    expect(strip.type).toBe('image/webp');expect(ctx.fillText.mock.calls.map(c=>c[0])).toContain('System Online');expect(ctx.fill).toHaveBeenCalledTimes(3);expect(ctx.drawImage).toHaveBeenCalledTimes(5);expect(ctx.drawImage.mock.calls[0].slice(1)).toEqual([24,76,32,24]);
   });
   it('uses backend ranks, including a player best that supersedes the newly posted row',()=>{
     const entry={player_name:'Kai',country:'JP'};

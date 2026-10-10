@@ -1,6 +1,7 @@
 # Wawa Hero — webcam dance rhythm game
 
 On-screen name/wordmark: **WAWA HERO** (never "Block Party").
+Typography: Chakra Petch only (see src/styles/hud.css tokens)
 
 Three.js voxel concert stage + MediaPipe pose tracking. The player stands ~2 m from the
 laptop and performs arm moves on cue. Score + calories burnt.

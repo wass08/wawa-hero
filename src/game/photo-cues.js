@@ -10,7 +10,7 @@ export function createPhotoCueScheduler(notes,{bpm=120,onSchedule=()=>{},onPose=
   function cancel(){for(const voice of scheduled.values())try{voice?.stop();}catch{}scheduled.clear();}
   return {
     cues,
-    reset(){cancel();done.clear();prompted.clear();last=lastPerf=null;paused=false;},
+    reset(time,includeBoundary=false){cancel();done.clear();prompted.clear();last=lastPerf=null;paused=false;if(Number.isFinite(time))for(const cue of cues)if(includeBoundary?cue.t<time:cue.t<=time)done.add(cue);},
     suspend(){cancel();paused=true;},
     update(time,playing=true,perfSeconds=performance.now()/1000){
       // A stalled render loop is elapsed time, not a seek: it must still snap.
@@ -27,8 +27,14 @@ export function createPhotoCueScheduler(notes,{bpm=120,onSchedule=()=>{},onPose=
         }break;}
         if(playing&&time>=cue.t){
           // Skip stale cues on an initial seek; a normal crossing fires once.
-          done.add(cue);scheduled.delete(cue);
-          if((last!==null&&!seek&&last<=cue.t)||time-cue.t<.05)onSnap(cue);
+          const planned=scheduled.has(cue);done.add(cue);scheduled.delete(cue);
+          if((last!==null&&!seek&&last<=cue.t)||time-cue.t<.05){
+            // A loop/transport can begin exactly at the flash without a
+            // countdown. Schedule the shutter once, at this crossing.
+            if(!planned)onSchedule(cue);
+            if(!prompted.has(cue)){prompted.add(cue);onPose(cue);}
+            onSnap(cue);
+          }
         }
       }
       last=time;lastPerf=perfSeconds;return countdown;

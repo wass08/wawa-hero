@@ -8,7 +8,7 @@
   {"t": 40.298, "why": "beat 83: pre-chorus 1 'Strike a POSE'"},
   {"t": 83.615, "why": "beat 173: instrumental break peak (brass stabs)"},
   {"t": 113.383, "why": "beat 235: pre-chorus 2 'Strike a POSE'"},
-  {"t": 142.617, "why": "beat 296: last brass stab before the hard stop (~143.1 s)"}
+  {"t": 143.105, "why": "beat 297: FINAL POSE on the last hit = the hard stop (~143.1 s); review moved it here from beat 296 so the outro stabs can be claps"}
  ],
  "camera": [
   {"t": 6.502, "shot": "orbit", "ease": 2.0, "why": "beat 13: slap bass + drums join the wah-wah riff"},
@@ -80,6 +80,22 @@
     {"t": 134.014, "move": "clap", "lyric": "(Clap clap!) - not audible in the vocal; on the beat after 'Wawa Hero!' [not sung in chorus 2: routine kept]"},
     {"t": 134.49, "move": "clap", "lyric": "(Clap clap!) [not sung in chorus 2: routine kept]"},
     {"t": 135.442, "move": "sweep", "lyric": "reach for the STARS (arms up) ... sweep 'em to the GROUND [not sung in chorus 2: routine kept]", "dur": 1.927, "snap": false}
+   ]
+  },
+  {
+   "label": "pre-chorus 2 ending into chorus 2 (review)",
+   "start": 117.952, "end": 120.593, "snap": "half",
+   "notes": [
+    {"t": 118.19, "move": "sweep", "durBeats": 4, "lyric": "last pre-chorus bar ('...take a bow' pickup) -> sweep lands on the chorus 2 drop", "why": "review: 'wawa-hero @ 2:00.111 bar 62.4 note #109 up -> could be a sweep to match the prechorus ending into chorus'. Starts on the downbeat of the last pre-chorus bar (beat 245), ends exactly on the chorus 2 entry downbeat (beat 249)"}
+   ]
+  },
+  {
+   "label": "outro brass stabs (review)",
+   "start": 139.285, "end": 143.105, "snap": "half",
+   "notes": [
+    {"t": 141.153, "move": "clap", "snap": false, "lyric": "brass stab 1 (beat 293)", "why": "review 'wawa-hero @ 2:21.169 bar 73.4: if we could have claps (try to align with the music)'. Stab attack measured at 141.153 s (-36 ms off the grid)"},
+    {"t": 141.866, "move": "clap", "snap": false, "lyric": "brass stab 2 (beat ~294.4, between beats)", "why": "review 'wawa-hero @ 2:22.048 bar 74.2': nearest real stab is 141.866 s; the stabs fall 1.5 beats apart (293, 294.5, 296)"},
+    {"t": 142.584, "move": "clap", "snap": false, "lyric": "brass stab 3 (beat 296)", "why": "third stab of the pattern, attack 142.584 s (-33 ms off the grid)"}
    ]
   }
  ]

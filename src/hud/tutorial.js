@@ -1,3 +1,4 @@
+import {numeralHTML} from '../typography.js';
 import { MOVE_IDS, CUES, iconSVG } from '../moves.js';
 import { createJudge } from '../pose/index.js';
 export function createTutorial({stage,onDone}) {
@@ -6,7 +7,7 @@ export function createTutorial({stage,onDone}) {
   const cards=[...MOVE_IDS,'photo'],done=new Set(),practice=[0,1].map(()=>({notes:null,start:0,judge:createJudge()}));let index=0,started=0,cycle=-1;
   const buttons=cards.map((move,i)=>{const b=document.createElement('button');b.className='tutorial-move';b.type='button';b.innerHTML=iconSVG(move)+`<span>${CUES[move].label}</span><b class="performed">✓</b>`;b.addEventListener('click',()=>select(i,performance.now()));root.append(b);return b;});
   function select(i,now){index=(i+cards.length)%cards.length;started=now;cycle=-1;for(const p of practice){p.notes=null;p.judge.reset();}render();}
-  function render(){buttons.forEach((b,i)=>{b.classList.toggle('active',i===index);b.classList.toggle('done',done.has(cards[i]));});document.getElementById('tutorialName').textContent=CUES[cards[index]].label;document.getElementById('tutorialInstruction').textContent=CUES[cards[index]].cue;document.getElementById('tutorialIcon').innerHTML=iconSVG(cards[index]);document.getElementById('tutorialIcon').style.color=`var(--${cards[index].replaceAll('_','-')})`;document.getElementById('tutorialProgress').textContent=`${done.size} / 6 moves performed · PHOTO is free: any pose!`;}
+  function render(){buttons.forEach((b,i)=>{b.classList.toggle('active',i===index);b.classList.toggle('done',done.has(cards[i]));});document.getElementById('tutorialName').textContent=CUES[cards[index]].label;document.getElementById('tutorialInstruction').textContent=CUES[cards[index]].cue;document.getElementById('tutorialIcon').innerHTML=iconSVG(cards[index]);document.getElementById('tutorialIcon').style.color=`var(--${cards[index].replaceAll('_','-')})`;document.getElementById('tutorialProgress').innerHTML=numeralHTML(`${done.size} / 6 moves performed · PHOTO is free: any pose!`);}
   document.getElementById('tutorialPrev').addEventListener('click',()=>select(index-1,performance.now()));document.getElementById('tutorialNext').addEventListener('click',()=>select(index+1,performance.now()));document.getElementById('tutorialDone').addEventListener('click',onDone);
   return {
     start(now){done.clear();select(0,now);},

@@ -72,11 +72,11 @@ export function createShotScheduler(chart = {}, { duration = 183.5, pinned } = {
   let cues = Array.isArray(chart.camera) ? chart.camera.filter(c => c && Number.isFinite(c.t) && c.t >= 0 && Object.hasOwn(SHOTS, c.shot)).map(c => ({ t: c.t, shot: c.shot, ease: Number.isFinite(c.ease) ? Math.max(0, c.ease) : 1.9 })).sort((a,b) => a.t-b.t) : [];
   if (!cues.length) cues = fallbackCameraTrack(chart, duration);
   if (cues[0].t > 0) cues.unshift({ t: 0, shot: 'front', ease: 0 });
-  const output = pose(), scratch = pose(); let frozenTime = null;
+  const output = pose(), scratch = pose(); let frozenTime = null, cutIndex = -1;
   function evaluate(out, index, time) {
     if (index < 0) return copy(out, SHOTS.front);
     const cue = cues[index]; target(out, cue, time, cues[index+1]?.t ?? Math.max(duration, cue.t + 16), phaseAt(time));
-    const p = cue.ease ? clamp((time - cue.t) / cue.ease) : 1, k = p*p*(3-2*p);
+    const p = cue.ease && index !== cutIndex ? clamp((time - cue.t) / cue.ease) : 1, k = p*p*(3-2*p);
     for (let j = 0; j < 3; j++) { out.pos[j] = cue.from.pos[j] + (out.pos[j] - cue.from.pos[j]) * k; out.look[j] = cue.from.look[j] + (out.look[j] - cue.from.look[j]) * k; }
     out.fov = cue.from.fov + (out.fov - cue.from.fov) * k;
     out.crowdBrightness = cue.from.crowdBrightness + (out.crowdBrightness - cue.from.crowdBrightness) * k; return out;
@@ -98,6 +98,7 @@ export function createShotScheduler(chart = {}, { duration = 183.5, pinned } = {
       else { const i = cameraCueIndex(cues, time); evaluate(output, i, time); output.shot = cues[i]?.shot ?? 'front'; output.cueIndex = i; }
       return output;
     },
-    pause(time) { frozenTime = time; }, resume() { frozenTime = null; }, reset() { frozenTime = null; },
+    pause(time) { frozenTime = time; }, resume() { frozenTime = null; }, reset() { frozenTime = null; cutIndex = -1; },
+    seek(time) { frozenTime = null; cutIndex = cameraCueIndex(cues, time); return this.sample(time); },
   };
 }

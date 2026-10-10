@@ -20,6 +20,7 @@ PHOTO = "photo"                       # free pose, not judged, not a dance move
 MOVES = DANCE_MOVES | {PHOTO}
 EASY_MOVES = {"up", "down", "clap", "sweep", PHOTO}
 N_PHOTOS, PHOTO_BEFORE, PHOTO_AFTER, PHOTO_MIN_T, PHOTO_SPREAD = 4, 2.0, 1.0, 29.5, 15.0
+FINAL_PHOTO_BEFORE = 1.0              # exception: a photo that is the chart's LAST note (final hit / hard stop)
 MIN_GAP, EASY_MIN_GAP = 0.40, 0.90
 CLAP_PAIR_BEATS = 0.5                 # "Clap. Clap." exception: clap -> clap may be half a beat apart
 SWEEP_BEATS = (2.0, 4.0)
@@ -141,8 +142,9 @@ def validate_chart(song: dict, c: dict, density: str = "normal") -> list[str]:
             e(f"{tag}: needs a free beat before the sweep (gap {gb:.2f} beats)")
         if a["move"] == "sweep" and gb < SWEEP_FREE_AFTER - BTOL:
             e(f"{tag}: needs >=1 beat after the sweep (gap {gb:.2f} beats)")
-        if b["move"] == PHOTO and gb < PHOTO_BEFORE - BTOL:
-            e(f"{tag}: needs 2 free beats before the photo (gap {gb:.2f} beats)")
+        need_b = FINAL_PHOTO_BEFORE if (b["move"] == PHOTO and i + 1 == len(notes) - 1) else PHOTO_BEFORE
+        if b["move"] == PHOTO and gb < need_b - BTOL:
+            e(f"{tag}: needs {need_b:g} free beats before the photo (gap {gb:.2f} beats)")
         if a["move"] == PHOTO and gb < PHOTO_AFTER - BTOL:
             e(f"{tag}: needs >=1 free beat after the photo (gap {gb:.2f} beats)")
     if density != "hard":
@@ -150,6 +152,8 @@ def validate_chart(song: dict, c: dict, density: str = "normal") -> list[str]:
         for a, b in zip(notes, notes[1:]):
             if PHOTO in (a["move"], b["move"]):      # photos are outside the density rules
                 chain = 0 if b["move"] == PHOTO else 1
+            elif a["move"] == "clap" and b["move"] == "clap":
+                pass                                  # clapping along (clap->clap) doesn't extend the run
             elif beats_between(c, end(a), b["t"]) < REST_BEATS - BTOL and "sweep" not in (a["move"], b["move"]):
                 chain += 1
                 if chain > MAX_CHAIN:
@@ -237,6 +241,8 @@ def difficulty_score(c: dict) -> float:
     span = max(1.0, ms[-1]["t"] - ms[0]["t"])
     load = sum(MOVE_WEIGHT[n["move"]] for n in ms)
     for a, b in zip(ms, ms[1:]):
+        if a["move"] == "clap" and b["move"] == "clap":
+            continue
         if beats_between(c, end(a), b["t"]) < 1.05:
             load += MOVE_WEIGHT[b["move"]]
     return load / span
@@ -250,8 +256,14 @@ def test_index_entries():
     ids = [s["id"] for s in data["songs"]]
     assert len(ids) == len(set(ids)), "duplicate song ids"
     for s in data["songs"]:
-        for k in ("id", "title", "artist", "audio", "cover", "bpm", "duration", "energy", "moves", "chart", "preview"):
+        for k in ("id", "title", "audio", "cover", "bpm", "duration", "energy", "moves", "chart", "preview"):
             assert k in s, f"{s.get('id')}: missing {k}"
+        ov_path = PUBLIC / "songs" / s["id"] / "overrides.json"
+        explicit = json.loads(ov_path.read_text()).get("artist") if ov_path.exists() else None
+        if explicit:
+            assert s.get("artist") == explicit, f"{s['id']}: artist must be the explicit one from overrides.json"
+        else:
+            assert "artist" not in s, f"{s['id']}: no artist unless explicitly provided (ID3 tags are not copied)"
         assert "charts" not in s, f"{s['id']}: per-difficulty 'charts' is gone; use 'chart'"
         assert s["chart"] == f"songs/{s['id']}/chart.json", s["chart"]
         assert (PUBLIC / s["audio"]).is_file(), s["audio"]
@@ -292,8 +304,10 @@ def test_photo_cues():
         ph = [n for n in c["notes"] if n["move"] == PHOTO]
         assert len(ph) == N_PHOTOS, f"{song['id']}: {len(ph)} photo cues"
         assert all(set(n) == {"t", "move"} for n in ph), "photo notes are {t, move} only"
-        for n in ph:   # on the beat grid (the app counts 3-2-1 on the beat); downbeat unless pinned on a sung word
-            assert _nearest(c["beats"], n["t"])[1] <= DOWNBEAT_TOL, f"{song['id']}: photo {n['t']} not on a beat"
+        bs = c["beats"]
+        grid = bs + [a + (b - a) / 2 for a, b in zip(bs, bs[1:])]
+        for n in ph:   # on the beat grid (beat, or half-beat for a pinned final hit); the app counts 3-2-1 on the beat
+            assert _nearest(grid, n["t"])[1] <= DOWNBEAT_TOL, f"{song['id']}: photo {n['t']} not on the beat grid"
         ts = [n["t"] for n in ph]
         assert ts[0] >= PHOTO_MIN_T, f"{song['id']}: first photo at {ts[0]} (< ~30 s)"
         assert all(b - a >= PHOTO_SPREAD for a, b in zip(ts, ts[1:])), f"{song['id']}: photos not spread: {ts}"
@@ -318,11 +332,15 @@ SONGS = {
                      (81.150, "up"), (82.890, "down"), (84.355, "clap"), (85.025, "clap"), (85.960, "clap"),
                      (86.375, "clap"), (88.140, "up"), (89.845, "down"), (92.000, "sweep")],
         "sweep_ends": [47.985, 93.365],          # "...sweep down LOW"
-        "photos": [33.959, 49.784, 65.503, 95.097],
+        "photos": [33.959, 49.784, 75.976, 103.793],   # review: 95.10 -> 75.98 (bar 43.4); mid-solo -> pose before the final hits
         "camera": {33.959: "drop", 37.489: "close", 49.784: "orbit", 77.717: "drop", 81.189: "close", 95.097: "drop"},
         "preview_start": 33.959,
-        "no_notes_before": 5.7,                  # fiddle/banjo kick-off
-        "last_note": (104.871, "clap"),          # the hard stop
+        "no_notes_before": 3.9,                  # fiddle/banjo kick-off (review: clap-along starts on beat 9 = 3.982 s)
+        "clap_along": [(3.982, 7.082, 8, (7.523, "up")),     # review: intro foot stomps, every beat, then the first up
+                       (77.717, 80.759, 8, (81.150, "up"))],  # review: chorus 2 lead-in, every beat, then "Arms UP!"
+        "last_note": (105.060, "clap"),          # review: photo 103.793 -> ONE final clap (a 0.225 s pair was too fast to track)
+        "music_hits": [(105.060, "clap")],       # re-attack of the final chord before the cut (~105.28 s)
+        "ending": [(103.793, "photo"), (105.060, "clap")],
     },
     "wawa-hero": {
         "energy": 2,
@@ -330,13 +348,16 @@ SONGS = {
                      (48.900, "clap"), (52.790, "split_lu"), (55.010, "split_ld"), (58.575, "sweep"),
                      (121.975, "clap"), (123.025, "up"), (123.920, "clap"), (124.905, "down"), (125.385, "clap"),
                      (125.865, "clap"), (129.685, "split_lu")],
-        "sweep_ends": [60.390],                  # "...to the GROUND" (chorus 2 does not sing it)
+        "sweep_ends": [60.390, 120.117],         # "...to the GROUND" (chorus 2 does not sing it); review sweep -> chorus 2 drop
+        "sweeps": [(118.190, 120.117)],          # review: pre-chorus 2 ending rides INTO the chorus 2 entry downbeat (beat 249)
+        "music_hits": [(141.153, "clap"), (141.866, "clap"), (142.584, "clap")],   # review: outro brass stab attacks
         "photos_on_words": [40.295, 113.375],    # "Strike a POSE" vocal attacks (photo on the nearest beat)
         "camera": {43.201: "drop", 120.117: "drop"},
         "camera_last": "wide",
         "preview_start": 43.201,
         "no_notes_before": 6.4,                  # solo wah-wah riff
-        "nothing_after": 143.11,                 # hard stop
+        "nothing_after": 143.15,                 # hard stop (sound cut ~143.1 s)
+        "last_note": (143.105, "photo"),         # review: FINAL POSE photo on the last hit (beat 297)
     },
     "system-online": {
         "energy": 3,
@@ -377,11 +398,27 @@ def test_songs_follow_the_voice():
         for t, mv in exp["commands"]:
             near = [n for n in ns if n["move"] == mv and abs(n["t"] - t) <= DOWNBEAT_TOL]
             assert near, f"{sid}: no {mv} within 30 ms of the sung command at {t}"
+        for t0, t1 in exp.get("sweeps", []):
+            sw = [n for n in ns if n["move"] == "sweep" and abs(n["t"] - t0) <= DOWNBEAT_TOL]
+            assert sw and abs(sw[0]["t"] + sw[0]["dur"] - t1) <= DOWNBEAT_TOL, f"{sid}: sweep {t0}->{t1} missing"
+            assert _nearest(c["downbeats"], t1)[1] <= DOWNBEAT_TOL, f"{sid}: sweep must end on a downbeat"
+            assert not any(t0 < n["t"] < t1 for n in ns if n is not sw[0]), f"{sid}: notes inside the sweep {t0}->{t1}"
+        for t0, t1, count, (tn, mvn) in exp.get("clap_along", []):
+            run = [n for n in ns if t0 - DOWNBEAT_TOL <= n["t"] <= t1 + DOWNBEAT_TOL]
+            assert [n["move"] for n in run] == ["clap"] * count, (sid, t0, [n["move"] for n in run])
+            assert all(_nearest(c["beats"], n["t"])[1] <= DOWNBEAT_TOL for n in run), f"{sid}: clap-along off the beat grid"
+            assert all(0.95 <= beats_between(c, a["t"], b["t"]) <= 1.05 for a, b in zip(run, run[1:])), f"{sid}: not every beat"
+            nxt = ns[ns.index(run[-1]) + 1]
+            assert nxt["move"] == mvn and abs(nxt["t"] - tn) <= DOWNBEAT_TOL, (sid, nxt)
+        for t, mv in exp.get("music_hits", []):
+            assert any(n["move"] == mv and abs(n["t"] - t) <= DOWNBEAT_TOL for n in ns), f"{sid}: no {mv} on the hit at {t}"
         for te in exp.get("sweep_ends", []):
             assert any(n["move"] == "sweep" and abs(n["t"] + n["dur"] - te) <= DOWNBEAT_TOL for n in ns), (sid, te)
         assert not any(n["t"] < exp["no_notes_before"] for n in ns), f"{sid}: notes during the intro"
         if "nothing_after" in exp:
             assert all(end(n) < exp["nothing_after"] for n in ns), f"{sid}: note after the hard stop"
+        if "ending" in exp:
+            assert [(round(n["t"], 3), n["move"]) for n in ns[-len(exp["ending"]):]] == exp["ending"], (sid, ns[-3:])
         if "last_note" in exp:
             t, mv = exp["last_note"]
             assert ns[-1]["move"] == mv and abs(ns[-1]["t"] - t) <= DOWNBEAT_TOL, (sid, ns[-1])
@@ -455,12 +492,20 @@ def test_validator_catches_violations():
     ]
     for ns in sweeps:
         assert validate_chart(song, dict(base, notes=ns)), ns
-    crowded = [[{"t": 5.0, "move": "up"}, {"t": 5.5, "move": "photo"}],                     # < 2 beats before
+    crowded = [[{"t": 5.0, "move": "up"}, {"t": 5.5, "move": "photo"}, {"t": 8.0, "move": "up"}],  # < 2 beats before
                [{"t": 5.0, "move": "photo"}, {"t": 5.3, "move": "up"}]]                     # < 1 beat after
     for ns in crowded:
         assert validate_chart(song, dict(base, notes=ns)), ns
-    chain = [{"t": 5.0 + 0.5 * i, "move": "clap"} for i in range(7)]
+    final_ok = [{"t": 5.0, "move": "clap"}, {"t": 5.5, "move": "photo"}]                   # final photo, 1 beat after
+    assert validate_chart(song, dict(base, notes=final_ok)) == [], validate_chart(song, dict(base, notes=final_ok))
+    final_bad = [{"t": 5.0, "move": "clap"}, {"t": 5.3, "move": "photo"}]                  # < 1 beat even if final
+    assert validate_chart(song, dict(base, notes=final_bad))
+    not_final = [{"t": 5.0, "move": "clap"}, {"t": 5.5, "move": "photo"}, {"t": 7.0, "move": "up"}]
+    assert validate_chart(song, dict(base, notes=not_final)), "a photo that is not the last note keeps the 2-beat rule"
+    chain = [{"t": 5.0 + 0.5 * i, "move": m} for i, m in enumerate(["up", "down"] * 4)]   # 8 pose changes, no rest
     assert validate_chart(song, dict(base, notes=chain))
+    clap_along = [{"t": 5.0 + 0.5 * i, "move": "clap"} for i in range(8)] + [{"t": 9.0, "move": "up"}]
+    assert validate_chart(song, dict(base, notes=clap_along)) == [], "clapping along on the beat is not a pose-change run"
 
 
 # ---- unit tests of the generator's ergonomics pass (need numpy; librosa not required)

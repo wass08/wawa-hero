@@ -12,6 +12,9 @@ beforeEach(() => { sources=[];vi.stubGlobal('AudioContext',Context);vi.stubGloba
 afterEach(()=>vi.unstubAllGlobals());
 
 describe('audio clock regressions',()=>{
+  it('defaults to an audible 70% SFX bus and 80% music through one shared master',async()=>{
+    const audio=createAudioPlayer();await audio.unlock();expect(audio.sfxBus.gain.value).toBe(.7);expect(audio.musicBus.gain.value).toBe(.8);expect(audio.sfxBus.connect).toHaveBeenCalledExactlyOnceWith(audio.masterGain);const bus=audio.sfxBus;audio.setSfxEnabled(false);expect(bus.gain.value).toBe(0);audio.setSfxEnabled(true);expect(audio.sfxBus).toBe(bus);expect(bus.gain.value).toBe(.7);
+  });
   it('resumes the buffer transport without subtracting output latency twice (#2)',async()=>{
     const audio=createAudioPlayer();await audio.load('song');audio.play();
     audio.ctx.currentTime=5;expect(audio.songTime()).toBeCloseTo(4.9);

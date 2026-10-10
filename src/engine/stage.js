@@ -1,3 +1,4 @@
+import {GAME_FONT} from '../typography.js';
 // Shared engine for the gameplay HUD directions: voxel stage, mirrored avatar,
 // stage-only port; the app owns song time, input, judging and HUD.
 import * as THREE from 'three';
@@ -9,6 +10,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { P, css, col } from './palette.js';
 import { MOVES } from '../moves.js';
 import { AVATAR_LOOKS } from './avatar-looks.js';
+import { createWallLayer } from './wall-layer.js';
 export const POSES = {
   idle:     { u: [0.13, -1, 0.05],     f: [0.06, -0.9, 0.45] },
   up:       { u: [1, 0.03, 0.06],      f: [0.02, 1, 0.14] },
@@ -237,11 +239,10 @@ export function createStage(opts) {
   scene.add(confetti);
 
   const st = { songTime: 0, beat: 0, beatPhase: 0, hype: 0.55 };
-  let clock = 0, liveArms = null;
+  let clock = 0, liveArms = null, simulationPaused = false;
   const strike = (m, player=0) => setPose(m === 'sweep' ? 'overhead' : m, m === 'clap' ? 0.24 : 0.55, player);
 
   /* ─── wall painters ─── */
-  const FONT = '"Pixelify Sans", ui-monospace, monospace';
   const maskC = document.createElement('canvas'); maskC.width = maskC.height = 6;
   { const m = maskC.getContext('2d'); m.fillStyle = css([0.05, 0.02, 285], 0.6); m.fillRect(4, 0, 2, 6); m.fillRect(0, 4, 6, 2); }
   const mask = wctx.createPattern(maskC, 'repeat');
@@ -324,7 +325,6 @@ export function createStage(opts) {
     });
     const api = {
       material, status: 'avatar', tick: false,
-      setMenuCamera(enabled){uniforms.menuMix.value=enabled?1:0;},
       setStatus(s) { api.status = s; o.onCam(s); },
       useVideo(live = true) {
         if (!live) {
@@ -336,6 +336,7 @@ export function createStage(opts) {
         api.status = 'live';
       },
       hit(move) { flash.copy(col(MOVES[move].c)); },
+      clearHit() {flash.setRGB(0,0,0);},
       update(dt) {
         uniforms.time.value = clock;
         uniforms.pulse.value = Math.max(0, 1 - st.beatPhase * 3);
@@ -393,9 +394,9 @@ export function createStage(opts) {
     photoCtx.clearRect(0,0,640,360);
     if(count!==null){
       photoCtx.fillStyle='rgba(18,11,40,.82)';photoCtx.fillRect(54,22,532,134);
-      photoCtx.textAlign='center';photoCtx.fillStyle='#fff6cb';photoCtx.font='700 44px "Pixelify Sans", monospace';photoCtx.fillText('STRIKE A POSE!',320,76);
+      photoCtx.textAlign='center';photoCtx.fillStyle='#fff6cb';photoCtx.font='700 44px "Chakra Petch", system-ui, sans-serif';photoCtx.fillText('STRIKE A POSE!',320,76);
       for(let i=0;i<3;i++){photoCtx.fillStyle=i<count?'#fff6cb':'#534563';photoCtx.fillRect(266+i*44,95,20,20);}
-      photoCtx.font='700 25px "Pixelify Sans", monospace';photoCtx.fillStyle='#fff6cb';photoCtx.fillText(String(count),320,145);
+      photoCtx.font=`700 25px ${GAME_FONT}`;photoCtx.fillStyle='#fff6cb';photoCtx.fillText(String(count),320,145);
     }
     photoTex.needsUpdate=true;
   }
@@ -436,11 +437,12 @@ export function createStage(opts) {
 
   /* ─── frame loop ─── */
   const q = new THREE.Quaternion(), e3 = new THREE.Euler(), pos = new THREE.Vector3(), one = new THREE.Vector3(1, 1, 1);
-  let last = performance.now(), wallTick = 0, beatLen = 60 / 120, menuIdle = 0, danceBeat = -1;
+  const wallLayer=createWallLayer({ctx:wctx,canvas:wallCanvas,texture:wallTex,draw:o.drawWall||drawWallAmbient,state:st,menuMix:jumbo?.material.uniforms.menuMix||{value:0}});
+  let last = performance.now(), beatLen = 60 / 120, menuIdle = 0, danceBeat = -1;
   const camGoal = camPos.clone(), camLook = camTarget.clone();
   function frame(now) {
     requestAnimationFrame(frame);
-    const dt = Math.min(0.1, (now - last) / 1000); last = now; clock += dt;
+    const dt = simulationPaused ? 0 : Math.min(0.1, (now - last) / 1000); last = now; clock += dt;
     st.beat = st.songTime / beatLen; st.beatPhase = ((st.beat % 1) + 1) % 1;
     o.onFrame(st, dt, now);
     if (o.menu && !liveArms) {
@@ -453,7 +455,7 @@ export function createStage(opts) {
     for(let player=0;player<playerCount;player++) {
       const p=performers[player],avatar=p.av;
       if(clock>p.until&&p.pose!=='idle')p.pose='idle';
-      const kArm=1-Math.exp(-dt*(p.pose==='clap'?32:17));
+      const kArm=p.snapArms?1:1-Math.exp(-dt*(p.pose==='clap'?32:17));p.snapArms=false;
       avatar.arms.forEach((a,i)=>{
         const arm=p.arms&&(i===0?p.arms.right:p.arms.left);
         if(arm){
@@ -500,14 +502,8 @@ export function createStage(opts) {
     confGeo.attributes.position.needsUpdate = true;
 
     // wall
-    wallTick += dt;
     if (wallMode === 'cam') jumbo.update(dt);
-    if ((wallMode!=='cam'||menuCamera) && wallTick > 1 / 30) {
-      wallTick = 0;
-      if (o.drawWall) o.drawWall(wctx, wallCanvas.width, wallCanvas.height, st);
-      else drawWallAmbient(wctx, wallCanvas.width, wallCanvas.height);
-      wallTex.needsUpdate = true;
-    }
+    wallLayer.update(dt,wallMode);
 
     const kc = 1 - Math.exp(-dt * 2.2); camPos.lerp(camGoal, kc); camTarget.lerp(camLook, kc);
     camera.position.set(camPos.x + (showCamera ? 0 : Math.sin(clock * 0.35) * 0.18), camPos.y + (showCamera ? 0 : Math.sin(clock * 0.5) * 0.06), camPos.z);
@@ -518,7 +514,10 @@ export function createStage(opts) {
   requestAnimationFrame(frame);
 
   return {
+    setPaused(value) { simulationPaused = !!value; },
+    resetEffects() { jumbo.clearHit(); },
     state: st, camera, project, captureJumbotron, setPhotoCue,
+    get wallDebug() { return {mode:wallMode,menuCamera,mix:jumbo?.material.uniforms.menuMix.value||0,paints:wallLayer.paints,textureVersion:wallTex.version,visible:wall.visible}; },
     strike, hit: m => jumbo.hit(m),
     setSweepProgress(progress,player=0) {
       const angle=Math.PI*(1-progress),p=performers[player];
@@ -526,7 +525,7 @@ export function createStage(opts) {
       setPose('sweep',.12,player);
     },
     setVideo: live => jumbo.useVideo(live),
-    setMenuCamera(enabled){menuCamera=!!enabled&&jumbo?.status==='live';jumbo?.setMenuCamera(menuCamera);skPlane.material.opacity=menuCamera?.3:1;},
+    setMenuCamera(enabled){menuCamera=!!enabled&&jumbo?.status==='live';wallLayer.setMenuCamera(menuCamera);skPlane.material.opacity=menuCamera?.3:1;},
     setPlayers(count) { playerCount=count===2?2:1;av2.group.visible=pad2.visible=playerCount===2;avatarAside=null; },
     setAvatarLayout(aside,cameraX=0) {
       if(playerCount===2) {
@@ -543,9 +542,13 @@ export function createStage(opts) {
     setHype: h => { st.hype = h; },
     setMenu: m => { o.menu = m; },
     setSongTime: t => { st.songTime = t; },
-    setAvatarArms(arms,player=0) { performers[player].arms=arms; if(player===0)liveArms=arms; },
+    setAvatarArms(arms,player=0,snap=false) { performers[player].arms=arms;if(snap)performers[player].snapArms=true; if(player===0)liveArms=arms; },
     setSkeleton: landmarks => { skeletonLandmarks = landmarks; },
-    setWall(mode) { if (mode === 'cam' && !jumbo) return; wallMode = mode; wall.material = mode === 'cam' ? jumbo.material : canvasMat; },
+    setWall(mode) {
+      if (mode === 'cam' && !jumbo) return;
+      wallMode = mode; wall.material = mode === 'cam' ? jumbo.material : canvasMat;
+      if(mode!=='cam'||menuCamera)wallLayer.paint();
+    },
     setCamera(p, t, instant) { showCamera = false; crowd?.bodies.material.color.setScalar(1); camGoal.set(...p); camLook.set(...t); if (instant) { camPos.copy(camGoal); camTarget.copy(camLook); } },
     setShot(shot) {
       showCamera = true; camPos.set(...shot.pos); camGoal.copy(camPos); camTarget.set(...shot.look); camLook.copy(camTarget);

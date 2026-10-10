@@ -7,8 +7,8 @@
  "photos": [
   {"t": 33.959, "why": "beat 77: gang 'Hey! Hey! Hey!' right before chorus 1"},
   {"t": 49.784, "why": "beat 113: right after chorus 1's sweep, the fiddle solo kicks in"},
-  {"t": 65.503, "why": "beat 149: fiddle and banjo solo, stomps"},
-  {"t": 95.097, "why": "beat 217: 'Yee-haw!' right after chorus 2's sweep"}
+  {"t": 75.976, "why": "beat 173: review: replaces the clap at 1:15.924 (bar 43.4), last bar of the solo before the chorus 2 clap-along. Replaces the old 'Yee-haw' photo at 95.10 s, which was too hard to play out of"},
+  {"t": 103.793, "why": "beat 237: strike a pose on the last downbeat before the two final hits (clap clap ending). Replaces the mid-solo photo (65.50 s), which would be < 15 s from the 75.98 s photo"}
  ],
  "camera": [
   {"t": 5.747, "shot": "orbit", "ease": 2.0, "why": "beat 13: fiddle and banjo kick-off"},
@@ -39,6 +39,21 @@
  ],
  "pins": [
   {
+   "label": "intro clap-along on the foot stomps (review)",
+   "start": 3.761, "end": 7.744, "snap": "half",
+   "notes": [
+    {"t": 3.982, "move": "clap", "lyric": "intro foot stomp (beat 9)", "why": "review: 'arms up, arms down could start with claps at 0:03.967 (bar 2.4) until this arms up at 0:07.453 (bar 4.4)'. The intro stomps hit every beat (about -13 dB vs -18 dB off-beat), measured 17-41 ms ahead of the tracked grid like the rest of the song, so the claps stay on the beat"},
+    {"t": 4.423, "move": "clap", "lyric": "intro foot stomp (beat 10)"},
+    {"t": 4.865, "move": "clap", "lyric": "intro foot stomp (beat 11)"},
+    {"t": 5.306, "move": "clap", "lyric": "intro foot stomp (beat 12)"},
+    {"t": 5.747, "move": "clap", "lyric": "intro foot stomp (beat 13)"},
+    {"t": 6.188, "move": "clap", "lyric": "intro foot stomp (beat 14)"},
+    {"t": 6.629, "move": "clap", "lyric": "intro foot stomp (beat 15)"},
+    {"t": 7.082, "move": "clap", "lyric": "intro foot stomp (beat 16)"},
+    {"t": 7.523, "move": "up", "lyric": "first 'up' (kept, pinned as the end of the clap-along)"}
+   ]
+  },
+  {
    "label": "chorus 1 (commands 35.7-48.0 s)",
    "start": 34.4, "end": 49.342, "snap": "half",
    "notes": [
@@ -54,9 +69,17 @@
    ]
   },
   {
-   "label": "chorus 2 (commands 81.2-93.4 s; gang shouts 77.5-80.7 s left free)",
-   "start": 77.717, "end": 94.668, "snap": "half",
+   "label": "chorus 2 lead-in clap-along (review) + chorus 2 (commands 81.2-93.4 s)",
+   "start": 77.496, "end": 94.668, "snap": "half",
    "notes": [
+    {"t": 77.717, "move": "clap", "lyric": "lead-in to chorus 2 over the gang shouts (beat 177)", "why": "review: 'we could add claps on the beats here: 1:17.642 (bar 44.4) until this arms up 1:21.115 (bar 46.4)'. Every tracked beat from the chorus 2 lead-in downbeat (beat 177, the drop camera cut) up to the pinned 'Arms UP!' (beat 185)"},
+    {"t": 78.147, "move": "clap", "lyric": "lead-in to chorus 2 over the gang shouts (beat 178)"},
+    {"t": 78.576, "move": "clap", "lyric": "lead-in to chorus 2 over the gang shouts (beat 179)"},
+    {"t": 79.018, "move": "clap", "lyric": "lead-in to chorus 2 over the gang shouts (beat 180)"},
+    {"t": 79.447, "move": "clap", "lyric": "lead-in to chorus 2 over the gang shouts (beat 181)"},
+    {"t": 79.888, "move": "clap", "lyric": "lead-in to chorus 2 over the gang shouts (beat 182)"},
+    {"t": 80.318, "move": "clap", "lyric": "lead-in to chorus 2 over the gang shouts (beat 183)"},
+    {"t": 80.759, "move": "clap", "lyric": "lead-in to chorus 2 over the gang shouts (beat 184)"},
     {"t": 81.15, "move": "up", "lyric": "Arms UP!", "snap": false, "why": "sung -39 ms off the beat grid: placed on the vocal"},
     {"t": 82.918, "move": "down", "lyric": "Arms DOWN!"},
     {"t": 84.355, "move": "clap", "lyric": "CLAP your hands", "snap": false, "why": "sung -102 ms off the beat grid: placed on the vocal"},
@@ -69,10 +92,10 @@
    ]
   },
   {
-   "label": "hard stop",
+   "label": "hard stop: the song ends with two hits (review)",
    "start": 104.438, "end": 105.96, "snap": "half",
    "notes": [
-    {"t": 104.867, "move": "clap", "lyric": "final stab / hard stop"}
+    {"t": 105.06, "move": "clap", "snap": false, "lyric": "final hit: re-attack of the last chord just before the cut at ~105.28 s", "why": "review: two claps on the final hits (104.835 + 105.060) were too close for camera tracking (0.225 s); 'skip the one before the last so they still have to do the last one'"}
    ]
   }
  ]

@@ -17,11 +17,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>Pose debug — Wawa Hero</title>
+<title>Pose debug · Wawa Hero</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/styles/hud.css">
 <style>
-  :root { color-scheme: dark; font-family: ui-monospace, Menlo, monospace; --p1: oklch(0.84 0.14 205); --p2: oklch(0.70 0.25 345); }
-  body { margin: 0; background: #0b0b12; color: #ddd; padding: 12px; }
+  :root { color-scheme: dark; font-family:var(--font); --p1: oklch(0.84 0.14 205); --p2: oklch(0.70 0.25 345); }
+  body { height:auto;overflow:auto;margin: 0; background: #0b0b12; color: #ddd; padding: 12px; }
   header { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
   h1 { font-size: 14px; margin: 0; color: #fff; }
   main { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
@@ -38,8 +41,9 @@
   .sweep { margin: 6px 0; font-size: 12px; }
   .sweep .gauge { height: 10px; background: #222; position: relative; margin-top: 3px; }
   .sweep .gauge > i { position: absolute; inset: 0 auto 0 0; background: oklch(0.82 0.11 300); }
-  pre { margin: 4px 0; font-size: 11px; color: #aaa; white-space: pre; }
-  button, select { font: inherit; }
+  pre { font-family:var(--font);margin: 4px 0; font-size: 11px; color: #aaa; white-space: pre; }
+  button, select, input { font: inherit; }
+  .row>span:last-child, .info { font-weight:700;font-variant-numeric:tabular-nums;font-feature-settings:'tnum'; }
   #status { color: #aaa; font-size: 12px; }
 </style>
 </head>
@@ -63,8 +67,10 @@
   Red line = judge onset threshold. Sweep: raise both arms HIGH to arm a practice sweep (HIGH → T → LOW out to the sides, upper arms only).
   Thresholds: POSE_CONFIG (src/pose/config.js; also window.POSE_CONFIG). URL: ?auto&amp;players=2&amp;model=lite</p>
 <script type="module">
+import { loadGameFonts, GAME_FONT } from '/src/typography.js';
 import { createPoseTracker, POSE_CONFIG, SCORE_KEYS, argmaxMove, createSweepPractice, createPoseRecorder } from '/src/pose/index.js';
 
+await loadGameFonts();
 window.POSE_CONFIG = POSE_CONFIG;
 window.poseDebug = {};
 const COLORS = ['oklch(0.84 0.14 205)', 'oklch(0.70 0.25 345)'];
@@ -143,9 +149,9 @@ function drawSkeleton(frame, color) {
     ctx.fillStyle = lm[i].visibility > 0.5 ? '#fff' : '#555';
     ctx.fillRect(lm[i].x * W - 3, lm[i].y * H - 3, 6, 6);
   }
-  ctx.fillStyle = color; ctx.font = 'bold 22px monospace';
+  ctx.fillStyle = color; ctx.font = `700 22px ${GAME_FONT}`;
   ctx.fillText(`P${frame.player + 1}`, lm[0].x * W - 14, lm[0].y * H - 30);
-  ctx.font = '16px monospace';
+  ctx.font = `600 16px ${GAME_FONT}`;
   ctx.fillText('L', lm[13].x * W - 18, lm[13].y * H);
   ctx.fillText('R', lm[14].x * W + 8, lm[14].y * H);
 }
