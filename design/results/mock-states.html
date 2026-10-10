@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WAWA HERO · results action-area states</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="mock.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="dl" viewBox="0 0 16 16"><path fill="currentColor" d="M7 1h2v7h2v1h-1v1h-1v1H9v1H7v-1H6v-1H5V9H4V8h2V1zM2 12h2v2h8v-2h2v4H2z"/></symbol>
+  <symbol id="globe" viewBox="0 0 16 16"><path fill="currentColor" d="M5 1h6v1h2v2h1v6h-1v2h-2v1H5v-1H3v-2H2V4h1V2h2zm0 2v2h2V3zm4 0v2h2V3zM3 6v4h2V6zm4 0v4h2V6zm4 0v4h2V6zM5 11v2h2v-2zm4 0v2h2v-2z"/></symbol>
+  <symbol id="wifi-off" viewBox="0 0 16 16"><path fill="currentColor" d="M1 1h2v2h2v2h2v2h2v2h2v2h2v2h2v2h-2v-2h-2v-2H9v-2H7V7H5V5H3V3H1zM7 12h2v2H7zM4 9h2v1H4zm6-1h1v1h-1zM1 6h2v1H1zm11-1h3v1h-3zM4 3h1v1H4zm3-1h4v1H7z"/></symbol>
+  <symbol id="arrow" viewBox="0 0 16 16"><path fill="currentColor" d="M2 7h8V5h1V4h1v1h1v1h1v1h1v2h-1v1h-1v1h-1v1h-1v-1h-1V9H2z"/></symbol>
+</svg>
+<div class="stage"><div class="beam b1"></div><div class="beam b2"></div><div class="floor"></div></div>
+
+<div class="sheet">
+  <h1>RESULTS · ACTION AREA STATES <span>Same row, same slots. Only the primary button and the status line change.</span></h1>
+
+  <!-- 1 ready -->
+  <section class="panel card">
+    <div class="tag"><b>1 · Ready</b><span>online · webp ok · name filled</span></div>
+    <div class="actions">
+      <button class="btn">Save with photos</button>
+      <button class="btn ghost">Save score only</button>
+      <span class="spacer"></span>
+      <button class="btn ghost"><svg class="ico"><use href="#dl"/></svg>Download all</button>
+      <button class="btn link">Don't save</button>
+    </div>
+    <p class="consent"><svg><use href="#globe"/></svg><span><b>Save with photos</b> puts these 4 photos on the public Wall of Heroes with your name, flag and score. <b>Save score only</b> keeps them on this laptop.</span></p>
+  </section>
+
+  <!-- 2 name missing -->
+  <section class="panel card">
+    <div class="tag"><b>2 · No name yet</b><span>primary pressed with an empty name</span></div>
+    <div class="fieldline"><div class="input err"><span class="ph">Your hero name</span><span class="count">0/16</span></div><span class="status err">Add a hero name to save.</span></div>
+    <div class="actions">
+      <button class="btn">Save with photos</button>
+      <button class="btn ghost">Save score only</button>
+      <span class="spacer"></span>
+      <button class="btn ghost"><svg class="ico"><use href="#dl"/></svg>Download all</button>
+      <button class="btn link">Don't save</button>
+    </div>
+    <p class="status">2P: a player without a name is simply not saved; the other one still is. The status says "P2 not saved (no name)".</p>
+  </section>
+
+  <!-- 3 saving -->
+  <section class="panel card">
+    <div class="tag"><b>3 · Saving</b><span>everything else locked</span></div>
+    <div class="actions">
+      <button class="btn busy"><span class="spin"></span>Saving…</button>
+      <button class="btn ghost disabled">Save score only</button>
+      <span class="spacer"></span>
+      <button class="btn ghost disabled"><svg class="ico"><use href="#dl"/></svg>Download all</button>
+      <button class="btn link disabled">Don't save</button>
+    </div>
+    <p class="status">Uploading 4 photos… <span style="color:var(--muted);opacity:.7">(2P: "Saving P1… then P2…")</span></p>
+  </section>
+
+  <!-- 4 saved -->
+  <section class="panel card">
+    <div class="tag"><b>4 · Saved</b><span>rank replaces the save buttons</span></div>
+    <div class="ranks"><span class="rank p1">#4 <small>on Showtime · PIXEL KAI</small></span><span class="rank p2">#9 <small>on Showtime · NOVA</small></span><span class="rank none">Top 100? Not yet <small>· 1P alt</small></span></div>
+    <div class="actions" style="margin-top:12px">
+      <button class="btn go"><svg class="ico"><use href="#arrow"/></svg>Continue</button>
+      <span class="spacer"></span>
+      <button class="btn ghost"><svg class="ico"><use href="#dl"/></svg>Download all</button>
+    </div>
+    <p class="status ok">Saved! Your photos are on the Wall of Heroes. <span style="color:var(--muted)">/ score-only: "Saved! Photos stayed on this laptop."</span></p>
+  </section>
+
+  <!-- 5 offline -->
+  <section class="panel card">
+    <div class="tag"><b>5 · Offline</b><span>saving hidden, download promoted</span></div>
+    <div class="actions">
+      <button class="btn"><svg class="ico"><use href="#dl"/></svg>Download all</button>
+      <button class="btn ghost">Continue</button>
+      <span class="spacer"></span>
+    </div>
+    <p class="status warn"><svg style="width:14px;height:14px;vertical-align:-2px;margin-right:6px"><use href="#wifi-off"/></svg>You're offline, so the score can't be saved. Download keeps your photos. Back online? The save buttons come back by themselves.</p>
+  </section>
+
+  <!-- 6 safari -->
+  <section class="panel card">
+    <div class="tag"><b>6 · No WebP (Safari) / avatar-cam run</b><span>photos can't be shared, score can</span></div>
+    <div class="photo-mini"><i class="lock"></i><i class="lock"></i><i class="lock"></i><i class="lock"></i></div>
+    <div class="actions">
+      <button class="btn">Save score</button>
+      <span class="spacer"></span>
+      <button class="btn ghost"><svg class="ico"><use href="#dl"/></svg>Download all</button>
+      <button class="btn link">Don't save</button>
+    </div>
+    <p class="status">This browser can't share photos yet (Safari has no WebP). They're in your download as PNG. <span style="color:var(--muted);opacity:.7">/ avatar-cam: "Avatar-cam photos stay on this laptop."</span></p>
+  </section>
+
+  <!-- 7 rate limited -->
+  <section class="panel card">
+    <div class="tag"><b>7 · Rate limited</b><span>countdown on the primary, nothing lost</span></div>
+    <div class="actions">
+      <button class="btn disabled">Retry in 42 s</button>
+      <button class="btn ghost disabled">Save score only</button>
+      <span class="spacer"></span>
+      <button class="btn ghost"><svg class="ico"><use href="#dl"/></svg>Download all</button>
+      <button class="btn link">Don't save</button>
+    </div>
+    <p class="status warn">Whoa, too many saves from this connection. Hang on, nothing is lost. <span style="color:var(--muted)">2P, P1 saved then P2 blocked: P1 shows its rank, the countdown only retries P2.</span></p>
+  </section>
+
+  <!-- 8 error -->
+  <section class="panel card">
+    <div class="tag"><b>8 · Failed</b><span>primary becomes the retry</span></div>
+    <div class="actions">
+      <button class="btn">Try again</button>
+      <button class="btn ghost">Save score only</button>
+      <span class="spacer"></span>
+      <button class="btn ghost"><svg class="ico"><use href="#dl"/></svg>Download all</button>
+      <button class="btn link">Don't save</button>
+    </div>
+    <p class="status err">Couldn't save. Your photos are still here.<span style="color:var(--muted)"> / partial: "Score saved, 2 of 4 photos didn't upload. They're in your download."</span></p>
+  </section>
+</div>
+</body>
+</html>

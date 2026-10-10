@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WAWA HERO</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/styles/hud.css">
+</head>
+<body>
+<div id="stage" data-od-id="stage-3d" aria-label="3D stage behind the menu"></div>
+<div class="hud" id="hud" data-state="title" data-od-id="menu-hud">
+  <header class="brand" data-show="title" data-od-id="wordmark">
+    <h1>WAWA HERO</h1>
+    <p>The rhythm game you play with your arms</p>
+  </header>
+  <section class="title-choices" data-show="title" aria-label="Choose players">
+    <div class="player-choices"><button class="player-choice panel" id="onePlayer" type="button" aria-pressed="true"><span class="choice-icon" id="onePlayerIcon"></span><strong>1 PLAYER</strong><span>LEFT UP</span></button><button class="player-choice panel" id="twoPlayers" type="button" aria-pressed="false"><span class="choice-icon" id="twoPlayersIcon"></span><strong>2 PLAYERS</strong><span>RIGHT UP</span></button></div>
+    <button class="btn-play title-start" id="titleStart" type="button"><span id="titleClapIcon"></span>CLAP TO START</button>
+    <p class="body-status" id="bodyStatus" role="status">Step back · keep shoulders and elbows in frame</p>
+  </section>
+  <button class="ghost tutorial-link" id="tutorialBtn" type="button" data-show="title">How to play</button>
+  <div class="camera-prompt" id="cameraPrompt" hidden><section class="modal panel"><span class="label">Your camera is your controller</span><h2>Allow camera to play</h2><p id="cameraMessage"></p><button class="btn-play" id="cameraRetry" type="button">Allow camera</button></section></div>
+  <button class="ghost back-button" id="backBtn" data-show="songs" type="button"><svg viewBox="0 0 40 40" aria-hidden="true"><circle class="back-track" cx="20" cy="20" r="16"/><circle id="backFill" pathLength="100" cx="20" cy="20" r="16"/><path d="M23 13l-7 7 7 7"/></svg><span>Back</span></button>
+  <section class="setlist panel" data-show="songs" data-od-id="setlist">
+    <div class="setlist-head"><span class="label">Setlist</span><span class="meta">Choose your track</span></div>
+    <ol class="rows" id="rows"></ol>
+  </section>
+  <section class="detail panel" data-show="songs" data-od-id="song-detail">
+    <div class="song-view">
+      <span class="label">Selected</span>
+      <h2 id="dTitle"></h2>
+      <p class="artist" id="dArtist"></p>
+      <dl class="stats"><div><dt>BPM</dt><dd id="dBpm"></dd></div><div><dt>Length</dt><dd id="dLen"></dd></div><div><dt>Best</dt><dd id="dBest">—</dd></div></dl>
+      <div class="feat"><span class="label">Moves</span><div class="move-icons" id="dMoves"></div></div>
+      <div class="feat"><span class="label">Energy</span><div class="pips" id="dEnergy"></div></div>
+      <button type="button" class="btn-play" id="playBtn" data-od-id="cta-choose-song">Choose this song</button>
+    </div>
+  </section>
+  <nav class="legend" id="legend" data-show="songs count tutorial" aria-label="Moves" data-od-id="gesture-legend"></nav>
+  <section class="song panel" data-show="play pause">
+    <div class="title" id="songTitle"></div><div class="meta" id="songMeta"></div>
+    <div class="bar"><i id="songBar"></i></div>
+  </section>
+  <div class="score-controls" data-show="play pause">
+  <section class="score panel player-one-score" data-show="play pause" aria-label="Score">
+    <span class="label" id="scoreLabel">Score</span><span class="digits" id="score"></span>
+    <div class="row"><span class="stars" id="stars"></span><span class="mult" id="mult" data-m="1">×1</span></div>
+    <div class="hype"><span class="label">Crowd</span><div class="meter" id="meter"></div></div>
+    <div class="calories"><span id="flame"></span><span class="label">Calories</span><b id="kcal">0.0</b><small>kcal</small></div>
+  </section>
+  <section class="score panel player-two-score" data-show="play pause" aria-label="Player 2 score"><span class="label">P2 · SCORE</span><span class="digits" id="score2"></span><div class="row"><span class="stars" id="stars2"></span><span class="mult" id="mult2">×1</span></div><div class="calories"><span class="label">Calories</span><b id="kcal2">0.0</b><small>kcal</small></div><div class="p2-combo"><b id="combo2">0</b><span class="label">COMBO</span></div></section>
+  <button class="ghost pause-btn" id="pauseBtn" data-show="play">Ⅱ Pause</button>
+  </div>
+  <div class="sweep-gauges" data-show="play pause"><div class="sweep-gauge panel" id="sweepGauge" hidden><svg viewBox="0 0 120 70"><path class="arc-bg" d="M10 60 A50 50 0 0 1 110 60"/><path class="arc-fill" id="arc1" pathLength="100" d="M10 60 A50 50 0 0 1 110 60"/></svg><b>P1 · HIGH → T → DOWN</b><span>SWEEP: arms up high, then down the sides</span></div><div class="sweep-gauge panel" id="sweepGauge2" hidden><svg viewBox="0 0 120 70"><path class="arc-bg" d="M10 60 A50 50 0 0 1 110 60"/><path class="arc-fill" id="arc2" pathLength="100" d="M10 60 A50 50 0 0 1 110 60"/></svg><b>P2 · HIGH → T → DOWN</b><span>SWEEP: arms up high, then down the sides</span></div></div>
+  <div class="combo" data-show="play pause"><div class="n" id="combo">0</div><div class="label">Combo</div></div>
+  <div class="rail" data-show="play pause"><div class="rail-track" id="railTrack"><div class="ring" id="ring"></div></div></div>
+  <div id="judgeLayer" data-show="play"></div>
+  <div class="overlay" data-show="pause"><section class="modal panel"><span class="label">Take a breather</span><h2>PAUSED</h2><button class="btn-play" id="resumeBtn">Resume the party</button><button class="ghost" id="quitBtn">Back to songs</button></section></div>
+  <div class="overlay" id="startGate" hidden><section class="modal panel"><span class="label">Your stage is ready</span><h2>LET’S DANCE</h2><p>Click / clap to start</p><button class="btn-play" id="startBtn">Start song</button></section></div>
+  <section class="results panel" data-show="results">
+    <div id="resultsContent"></div>
+    <div hidden><span id="resultSong"></span><span id="resultStars"></span><span id="resultScore"></span><span id="newBest"></span><span id="resultCombo"></span><span id="resultPerfect"></span><span id="resultGood"></span><span id="resultMiss"></span><span id="resultKcal"></span><span id="resultTime"></span></div>
+  </section>
+  <section class="wall-gallery" id="wallGallery" data-show="title" hidden><span class="label">Wall of heroes</span><div id="playerWall"></div></section>
+  <section class="tutorial-info panel" data-show="tutorial"><span class="label">HOW TO PLAY · FIND YOUR MOVES</span><h2 id="tutorialName"></h2><div id="tutorialIcon"></div><p id="tutorialInstruction"></p><div class="tutorial-actions"><button class="ghost" id="tutorialPrev">← Previous</button><button class="ghost" id="tutorialNext">Next →</button></div><button class="btn-play" id="tutorialDone">I'm ready · choose a song</button></section>
+  <section class="tutorial-checklist panel" data-show="tutorial"><span class="label">Six moves + PHOTO</span><div id="tutorialMoves"></div><p id="tutorialProgress"></p></section>
+  <figure id="photoPop" class="photo-pop" aria-live="polite"><img alt="Your shared photo moment"><figcaption>SNAP!</figcaption></figure>
+  <div class="hero-flash" id="heroFlash" aria-hidden="true"></div><div class="hero-toast" id="heroToast" role="status">HERO MOMENT CAPTURED</div>
+
+</div>
+<script type="module" src="/src/main.js"></script>
+</body>
+</html>

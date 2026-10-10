@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WAWA HERO · results (2P) mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="mock.css">
+<style>
+  .results { width: 1300px; padding-top: 22px; }
+  .two .score-card .points { font-size: 68px; }
+  .banner { font-size: 48px; margin: 4px 0 2px; }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="star" viewBox="0 0 11 11"><path fill="currentColor" d="M5 0h1v2h1v2h2v1h2v1H9v1H8v1h1v2H8v1H7v-1H6V9H5v1H4v1H3V9H2V7h1V6H2V5H0V4h2V3h1V2h1V0h1z"/></symbol>
+  <symbol id="dl" viewBox="0 0 16 16"><path fill="currentColor" d="M7 1h2v7h2v1h-1v1h-1v1H9v1H7v-1H6v-1H5V9H4V8h2V1zM2 12h2v2h8v-2h2v4H2z"/></symbol>
+  <symbol id="globe" viewBox="0 0 16 16"><path fill="currentColor" d="M5 1h6v1h2v2h1v6h-1v2h-2v1H5v-1H3v-2H2V4h1V2h2zm0 2v2h2V3zm4 0v2h2V3zM3 6v4h2V6zm4 0v4h2V6zm4 0v4h2V6zM5 11v2h2v-2zm4 0v2h2v-2z"/></symbol>
+  <symbol id="chev" viewBox="0 0 16 16"><path fill="currentColor" d="M3 5h2v2h2v2h2V7h2V5h2v2h-2v2H9v2H7V9H5V7H3z"/></symbol>
+</svg>
+<div class="stage"><div class="beam b1"></div><div class="beam b2"></div><div class="floor"></div></div>
+
+<main class="panel results">
+  <header class="rs-head">
+    <span class="kicker">Set complete · <b>Showtime</b></span>
+    <span class="song">1:44 · 108 BPM</span>
+  </header>
+
+  <section class="score-zone two">
+    <h1 class="banner p1">PLAYER 1 WINS!</h1>
+    <div class="score-card p1">
+      <div class="who"><span class="swatch"></span>PLAYER 1</div>
+      <div class="points">42,680 <span class="new-best">NEW BEST</span></div>
+      <div class="stars"><svg class="on"><use href="#star"/></svg><svg class="on"><use href="#star"/></svg><svg class="on"><use href="#star"/></svg></div>
+      <dl class="stat-row">
+        <div class="stat"><dt>Combo</dt><dd>64</dd></div>
+        <div class="stat"><dt>Perfect</dt><dd class="perfect">92</dd></div>
+        <div class="stat"><dt>Good</dt><dd class="good">12</dd></div>
+        <div class="stat"><dt>Miss</dt><dd class="miss">3</dd></div>
+        <div class="stat"><dt>Burned</dt><dd>12.8<small>kcal</small></dd></div>
+      </dl>
+    </div>
+    <div class="score-card p2">
+      <div class="who"><span class="swatch"></span>PLAYER 2</div>
+      <div class="points">38,800</div>
+      <div class="stars"><svg class="on"><use href="#star"/></svg><svg class="on"><use href="#star"/></svg><svg><use href="#star"/></svg></div>
+      <dl class="stat-row">
+        <div class="stat"><dt>Combo</dt><dd>36</dd></div>
+        <div class="stat"><dt>Perfect</dt><dd class="perfect">82</dd></div>
+        <div class="stat"><dt>Good</dt><dd class="good">18</dd></div>
+        <div class="stat"><dt>Miss</dt><dd class="miss">7</dd></div>
+        <div class="stat"><dt>Burned</dt><dd>11.2<small>kcal</small></dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="save-zone">
+    <div class="save-grid two">
+      <div class="identity p1">
+        <label class="field"><span class="lbl">P1 hero name <em>up to 16 letters</em></span>
+          <div class="input"><span>PIXEL KAI</span><span class="count">9/16</span></div>
+        </label>
+        <label class="field"><span class="lbl">Country <em>optional</em></span>
+          <div class="input combo"><span class="flag" style="--flag:hsl(338 55% 34%)">JP</span><span>Japan</span><svg class="chev"><use href="#chev"/></svg></div>
+        </label>
+      </div>
+      <div class="identity p2">
+        <label class="field"><span class="lbl">P2 hero name <em>up to 16 letters</em></span>
+          <div class="input"><span class="ph">Your hero name</span><span class="count">0/16</span></div>
+        </label>
+        <label class="field"><span class="lbl">Country <em>optional</em></span>
+          <div class="input combo focus"><span class="flag sm" style="--flag:hsl(96 55% 34%)">BR</span><span>br</span><span class="caret"></span><svg class="chev"><use href="#chev"/></svg>
+            <div class="listbox">
+              <div class="group">Suggested</div>
+              <div class="opt active"><span class="flag sm" style="--flag:hsl(96 55% 34%)">BR</span><span><mark>Br</mark>azil</span><span class="code">BR</span></div>
+              <div class="group">All countries</div>
+              <div class="opt"><span class="flag sm" style="--flag:hsl(205 55% 34%)">BN</span><span><mark>Br</mark>unei</span><span class="code">BN</span></div>
+              <div class="opt"><span class="flag sm" style="--flag:hsl(12 55% 34%)">GB</span><span>United Kingdom · <mark>Br</mark>itain</span><span class="code">GB</span></div>
+              <div class="foot"><span><kbd>↑↓</kbd> move</span><span><kbd>Enter</kbd> pick</span><span><kbd>Esc</kbd> close</span></div>
+            </div>
+          </div>
+        </label>
+      </div>
+    </div>
+
+    <div class="photos">
+      <div class="photos-head"><span class="lbl">Your 4 photos · both players</span><span class="hint">Click one to leave it out</span></div>
+      <div class="photo-row">
+        <figure class="shot"><img src="img/shot-1.png" alt=""><span class="n">1</span><span class="t">0:34</span></figure>
+        <figure class="shot"><img src="img/shot-2.png" alt=""><span class="n">2</span><span class="t">0:58</span></figure>
+        <figure class="shot out"><img src="img/shot-3.png" alt=""><span class="n">3</span><span class="label"><b>LEFT OUT</b>click to put it back</span></figure>
+        <figure class="shot"><img src="img/shot-4.png" alt=""><span class="n">4</span><span class="t">1:40</span></figure>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn">Save with photos</button>
+      <button class="btn ghost">Save score only</button>
+      <span class="spacer"></span>
+      <button class="btn ghost"><svg class="ico"><use href="#dl"/></svg>Download all</button>
+      <button class="btn link">Don't save</button>
+    </div>
+    <p class="consent"><svg><use href="#globe"/></svg><span>Saves both players. <b>Save with photos</b> puts the 3 kept photos on the public Wall of Heroes with your names, flags and scores. <b>Save score only</b> keeps them on this laptop.</span></p>
+  </section>
+</main>
+</body>
+</html>

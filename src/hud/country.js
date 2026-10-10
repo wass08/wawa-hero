@@ -1,0 +1,24 @@
+const COMMON=['US','GB','FR','DE','JP','BR','ES','IT','CA','AU','KR','MX'];
+const countryQuery=query=>query.trim().toLowerCase().replace(/^uk$/,'gb').replace(/^britain$/,'united kingdom');
+export function countryOptions(countries,query='',suggested=[]){
+  const q=countryQuery(query),sorted=countries.slice().sort((a,b)=>a.name.localeCompare(b.name));
+  const matches=c=>!q||c.name.toLowerCase().includes(q)||c.code.toLowerCase().includes(q);
+  const codes=[...new Set([...suggested,...COMMON].filter(Boolean))],first=codes.map(code=>sorted.find(c=>c.code===code)).filter(c=>c&&matches(c));
+  return [...first.map(c=>({...c,group:'Suggested'})),...sorted.filter(c=>!codes.includes(c.code)&&matches(c)).map(c=>({...c,group:'All countries'}))];
+}
+export function createCountryCombo(container,{board,value,onChange,slot}){
+  const input=container.querySelector('input'),badge=container.querySelector('.country-badge'),popup=container.querySelector('.listbox'),list=popup.querySelector('[role=listbox]');
+  let selected=value,previous=value,open=false,rows=[],index=0;
+  const id=`country-options-${slot}`;list.id=id;input.setAttribute('aria-controls',id);
+  function showValue(){input.value=board.countries.find(c=>c.code===selected)?.name||'';badge.replaceChildren(board.flagElement(selected));input.setAttribute('aria-expanded','false');input.removeAttribute('aria-activedescendant');}
+  function activate(n){index=Math.max(0,Math.min(rows.length-1,n));for(const el of list.querySelectorAll('[role=option]')){const is=Number(el.dataset.index)===index;el.classList.toggle('active',is);el.setAttribute('aria-selected',String(is));if(is){input.setAttribute('aria-activedescendant',el.id);el.scrollIntoView({block:'nearest'});}}}
+  function render(){rows=countryOptions(board.countries,input.value,[board.guessCountry(),value]);list.replaceChildren();let group='';rows.forEach((c,i)=>{if(c.group!==group){group=c.group;const label=document.createElement('div');label.className='group';label.textContent=group;list.append(label);}const row=document.createElement('div');row.className='opt';row.role='option';row.id=`${id}-${i}`;row.dataset.index=i;row.setAttribute('aria-selected','false');const name=document.createElement('span');const q=countryQuery(input.value),start=c.name.toLowerCase().indexOf(q);if(q&&start>=0){name.append(document.createTextNode(c.name.slice(0,start)));const mark=document.createElement('mark');mark.textContent=c.name.slice(start,start+q.length);name.append(mark,document.createTextNode(c.name.slice(start+q.length)));}else name.textContent=c.name;const code=document.createElement('span');code.className='code';if(q&&c.code.toLowerCase().includes(q)){const mark=document.createElement('mark');mark.textContent=c.code;code.append(mark);}else code.textContent=c.code;row.append(board.flagElement(c.code),name,code);row.addEventListener('pointerenter',()=>activate(i));row.addEventListener('mousedown',e=>e.preventDefault());row.addEventListener('click',()=>pick(i));list.append(row);});if(!rows.length){const empty=document.createElement('div');empty.className='group';empty.textContent='No countries found';list.append(empty);}activate(0);}
+  function begin(clear=true){if(open)return;open=true;previous=selected;popup.hidden=false;input.setAttribute('aria-expanded','true');if(clear)input.value='';badge.replaceChildren();render();}
+  function close(restore=false){if(!open)return;if(restore){const changed=selected!==previous;selected=previous;if(changed)onChange(selected);}open=false;popup.hidden=true;showValue();}
+  function pick(i=index){if(!rows[i])return;selected=rows[i].code;onChange(selected);close();input.focus();}
+  input.addEventListener('click',()=>begin());input.addEventListener('input',()=>{if(!open)begin(false);render();if(!input.value){selected=null;onChange(null);}});
+  input.addEventListener('keydown',e=>{if(['ArrowDown','ArrowUp'].includes(e.key)){e.preventDefault();e.stopPropagation();if(!open)begin();else activate(index+(e.key==='ArrowDown'?1:-1));}else if(open&&e.key==='Enter'){e.preventDefault();e.stopPropagation();pick();}else if(open&&e.key==='Escape'){e.preventDefault();e.stopPropagation();close(true);}else if(open&&e.key==='Tab'){pick();}else if(!open&&e.key==='Backspace'){e.preventDefault();begin();selected=null;onChange(null);index=-1;input.removeAttribute('aria-activedescendant');for(const row of list.querySelectorAll('[role=option]')){row.classList.remove('active');row.setAttribute('aria-selected','false');}} });
+  input.addEventListener('blur',()=>{if(open){if(!input.value){selected=null;onChange(null);}close();}});
+  container.querySelector('.chev').addEventListener('mousedown',e=>{e.preventDefault();input.focus();begin();});showValue();
+  return {get open(){return open;},get draft(){return open&&input.value.length>0;},set disabled(v){input.disabled=v;if(v)close();},close};
+}

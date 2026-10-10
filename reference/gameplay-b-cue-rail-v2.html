@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>B v2 · Cue Rail on the big stage — Gameplay HUD</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="hud.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<style>
+  /* B v2: B's single cue rail, shot from the crowd (C's low audience eye + A's LED wall).
+     The wall is a jumbotron playing the player's webcam as a shaded LED feed. */
+  .song { position: absolute; top: calc(var(--u) * 2); left: calc(var(--u) * 2); width: calc(var(--u) * 24); padding: calc(var(--u) * 1.2) calc(var(--u) * 1.5) calc(var(--u) * 1.4); }
+  .track { position: absolute; top: calc(var(--u) * 11.4); left: calc(var(--u) * 2); width: calc(var(--u) * 24); }
+
+  .cam { position: absolute; top: calc(var(--u) * 17.4); left: calc(var(--u) * 2); width: calc(var(--u) * 24); padding: calc(var(--u) * 1) calc(var(--u) * 1.2) calc(var(--u) * 1.1); display: grid; grid-template-columns: auto 1fr; gap: calc(var(--u) * 0.4) calc(var(--u) * 1); align-items: center; font-family: var(--font-body); }
+  .cam-dot { grid-row: span 2; width: calc(var(--u) * 1.2); height: calc(var(--u) * 1.2); background: var(--c, var(--muted)); }
+  .cam[data-s="live"] { --c: var(--miss); }
+  .cam[data-s="live"] .cam-dot { animation: rec 1.2s steps(2, jump-none) infinite; }
+  @keyframes rec { 50% { opacity: 0.25; } }
+  .cam b { font-weight: 600; font-size: calc(var(--u) * 1.15); }
+  .cam em { font-style: normal; font-size: calc(var(--u) * 0.95); color: var(--muted); }
+  .cam button { grid-column: 1 / -1; justify-self: start; margin-top: calc(var(--u) * 0.6); min-height: max(44px, calc(var(--u) * 3)); padding: 0 calc(var(--u) * 1.4); pointer-events: auto; font: 600 calc(var(--u) * 1.05) var(--font-body); color: var(--fg); background: color-mix(in oklch, var(--fg) 10%, transparent); border: calc(var(--u) * 0.15) solid color-mix(in oklch, var(--fg) 40%, transparent); cursor: pointer; }
+  .cam button:hover { background: color-mix(in oklch, var(--fg) 20%, transparent); }
+  .cam button:focus-visible { outline: calc(var(--u) * 0.25) solid var(--fg); outline-offset: 2px; }
+  .cam button[hidden] { display: none; }
+
+  .score { position: absolute; top: calc(var(--u) * 2); right: calc(var(--u) * 2); width: calc(var(--u) * 22); padding: calc(var(--u) * 1.3) calc(var(--u) * 1.6) calc(var(--u) * 1.5); display: grid; gap: calc(var(--u) * 0.9); justify-items: end; }
+  .score .digits { font-size: calc(var(--u) * 4.4); }
+  .score .row { display: flex; align-items: center; gap: calc(var(--u) * 1.2); }
+  .score .hype { width: 100%; display: flex; align-items: center; gap: calc(var(--u) * 1); margin-top: calc(var(--u) * 0.3); }
+  .score .hype .meter { flex: 1; height: calc(var(--u) * 0.8); }
+
+  .rail { position: absolute; left: 0; right: 0; bottom: calc(var(--u) * 1.6); height: calc(var(--u) * 13); }
+  .rail-track { position: absolute; inset: 0; }
+  .rail-track::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: calc(var(--u) * 7.4); transform: translateY(-50%); background: color-mix(in oklch, var(--bg) 80%, transparent); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); box-shadow: inset 0 calc(var(--u) * 0.18) 0 color-mix(in oklch, var(--border) 85%, transparent), inset 0 calc(var(--u) * -0.18) 0 color-mix(in oklch, var(--border) 85%, transparent); }
+  .tick { position: absolute; top: 50%; width: calc(var(--u) * 0.25); height: calc(var(--u) * 2); transform: translate(-50%, -50%); background: color-mix(in oklch, var(--fg) 22%, transparent); }
+  .tick.bar { height: calc(var(--u) * 4); background: color-mix(in oklch, var(--fg) 40%, transparent); }
+  .ring { position: absolute; left: 14%; top: 50%; width: calc(var(--u) * 11.6); height: calc(var(--u) * 11.6); transform: translate(-50%, -50%); box-shadow: inset 0 0 0 calc(var(--u) * 0.5) var(--fg); }
+  .ring::after { content: ''; position: absolute; inset: calc(var(--u) * -0.9); box-shadow: inset 0 0 0 calc(var(--u) * 0.3) var(--c, transparent); opacity: var(--f, 0); }
+  .cue { position: absolute; left: 0; top: 50%; width: calc(var(--u) * 9.4); height: calc(var(--u) * 9.4); display: grid; grid-template-rows: 1fr auto; justify-items: center; padding: calc(var(--u) * 1.1) calc(var(--u) * 0.4) calc(var(--u) * 0.9); background: var(--c); color: var(--bg); will-change: transform; }
+  .cue svg { width: calc(var(--u) * 5.2); }
+  .cue b { font-size: calc(var(--u) * 1.3); font-weight: 700; letter-spacing: 0.02em; line-height: 1; white-space: nowrap; }
+  .cue.next { z-index: 2; box-shadow: 0 0 0 calc(var(--u) * 0.4) var(--fg); }
+  .cue.missed { background: oklch(0.42 0.02 285); color: color-mix(in oklch, var(--fg) 55%, transparent); opacity: 0.7; }
+
+  .combo { position: absolute; left: 14%; bottom: calc(var(--u) * 24.5); transform: translateX(-50%); text-align: center; }
+  .combo .n { font-size: calc(var(--u) * 5.2); font-weight: 700; line-height: 0.95; -webkit-text-stroke: calc(var(--u) * 0.35) var(--bg); paint-order: stroke fill; }
+  .combo .label { margin-top: calc(var(--u) * 0.4); }
+  #judgeLayer { position: absolute; inset: 0; }
+  .dirtag { top: calc(var(--u) * 20.6); bottom: auto; }
+  .lite .cam { display: none; }
+</style>
+</head>
+<body>
+<div id="stage" data-od-id="stage-3d" aria-label="3D stage seen from the crowd, with the webcam jumbotron"></div>
+<div class="hud" data-od-id="hud-cue-rail-v2">
+  <div class="song panel" data-od-id="song-progress">
+    <div class="title" id="songTitle"></div>
+    <div class="meta" id="songMeta"></div>
+    <div class="bar"><i id="songBar"></i></div>
+  </div>
+  <div class="track panel" id="track" data-od-id="tracking-chip"></div>
+  <div class="cam panel" id="cam" data-s="avatar" data-od-id="jumbotron-status">
+    <span class="cam-dot"></span><b id="camTitle"></b><em id="camSub"></em>
+    <button type="button" id="camBtn" data-od-id="camera-toggle"></button>
+  </div>
+  <div class="score panel" data-od-id="score-panel">
+    <span class="label">Score</span>
+    <span class="digits" id="score"></span>
+    <div class="row"><span class="stars" id="stars"></span><span class="mult" id="mult" data-m="1">×1</span></div>
+    <div class="hype" data-od-id="crowd-meter"><span class="label">Crowd</span><div class="meter" id="meter"></div></div>
+  </div>
+  <div class="combo" data-od-id="combo"><div class="n" id="combo">0</div><div class="label">Combo</div></div>
+  <div class="rail" data-od-id="cue-rail">
+    <div class="rail-track" id="railTrack"><div class="ring" id="ring" data-od-id="hit-ring"></div></div>
+  </div>
+  <div id="judgeLayer"></div>
+  <a class="dirtag panel" href="index.html" data-od-id="direction-tag"><b>B v2</b> Big stage <span>· all directions</span></a>
+</div>
+<script type="module">
+  import { createGame, SONG, MOVES, BEAT, iconSVG, fmtDigits, starsHTML, popJudge, mountTrack } from './rhythm-core.js';
+  const $ = id => document.getElementById(id);
+  $('songTitle').textContent = SONG.title;
+  $('songMeta').textContent = SONG.meta;
+  const setMode = mountTrack($('track'));
+  const meter = $('meter'); meter.innerHTML = '<b></b>'.repeat(12);
+  const segs = [...meter.children];
+  const track = $('railTrack'), ring = $('ring');
+  const ticks = Array.from({ length: 12 }, () => { const t = document.createElement('div'); t.className = 'tick'; track.insertBefore(t, ring); return t; });
+  const cues = Array.from({ length: 20 }, () => { const c = document.createElement('div'); c.className = 'cue'; c.style.display = 'none'; track.appendChild(c); return c; });
+  let flash = 0, prev = {};
+
+  const CAM_COPY = {
+    avatar:      ['Big screen: avatar cam', 'Your camera is off', 'Show my camera'],
+    requesting:  ['Asking for camera…', 'Allow access in the browser prompt', ''],
+    live:        ['Big screen: your camera', 'Shaded LED feed · mirrored', ''],
+    blocked:     ['Camera blocked', 'Showing avatar cam instead', 'Try again'],
+    unavailable: ['No camera found', 'Showing avatar cam instead', ''],
+  };
+  function showCam(s) {
+    const [t, sub, btn] = CAM_COPY[s];
+    $('cam').dataset.s = s; $('camTitle').textContent = t; $('camSub').textContent = sub;
+    $('camBtn').textContent = btn; $('camBtn').hidden = !btn;
+  }
+  showCam('avatar');
+
+  const game = createGame({
+    container: $('stage'),
+    camera: { pos: [0, 1.5, 11.5], target: [0, 3.3, -4], fov: 58 },
+    avatar: { x: 0, z: 0.6, scale: 1.45 },
+    wall: 'cam', wallBox: { w: 21, h: 7.8, y: 4.2, z: -6.2 },
+    crowd: true, crowdClearX: 2.4, beams: 0.5, lookahead: 2.0,
+    onCam: showCam,
+    onJudge(j) {
+      const r = ring.getBoundingClientRect();
+      popJudge($('judgeLayer'), j, r.left + r.width / 2, r.top - innerHeight * 0.12);
+      if (j.result !== 'miss') { ring.style.setProperty('--c', `var(--${j.move})`); flash = 1; }
+    },
+    onFrame(st) {
+      const W = track.clientWidth, ringX = W * 0.14, pps = (W - ringX) / st.lookahead;
+      const b0 = Math.ceil((st.songTime - 0.3) / BEAT);
+      ticks.forEach((t, i) => {
+        const b = b0 + i, d = b * BEAT - st.songTime;
+        t.style.display = d < st.lookahead + 0.4 ? '' : 'none';
+        t.style.left = (ringX + d * pps) + 'px';
+        t.classList.toggle('bar', ((b % 4) + 4) % 4 === 0);
+      });
+      let k = 0, next = false;
+      for (const n of st.notes) {
+        const d = n.t - st.songTime;
+        if (d > st.lookahead + 0.3) break;
+        if (d < -0.6 || (n.judged && n.judged !== 'miss')) continue;
+        const el = cues[k++]; if (!el) break;
+        if (el.dataset.t !== String(n.t)) {
+          el.dataset.t = n.t;
+          el.innerHTML = iconSVG(n.move) + `<b>${MOVES[n.move].label}</b>`;
+          el.style.setProperty('--c', `var(--${n.move})`);
+        }
+        const isNext = !next && !n.judged; if (isNext) next = true;
+        el.classList.toggle('next', isNext);
+        el.classList.toggle('missed', n.judged === 'miss');
+        el.style.display = '';
+        el.style.transform = `translate3d(${ringX + d * pps}px, -50%, 0) translateX(-50%) scale(${isNext ? 1.1 : 1})`;
+      }
+      for (; k < cues.length; k++) cues[k].style.display = 'none';
+      flash = Math.max(0, flash - 0.06); ring.style.setProperty('--f', flash);
+      const s = { score: st.score, combo: st.combo, mult: st.mult, stars: st.stars, hype: Math.round(st.hype * 12) };
+      if (s.score !== prev.score) $('score').innerHTML = fmtDigits(s.score);
+      if (s.combo !== prev.combo) $('combo').textContent = s.combo;
+      if (s.mult !== prev.mult) { $('mult').textContent = '×' + s.mult; $('mult').dataset.m = s.mult; }
+      if (s.stars !== prev.stars) $('stars').innerHTML = starsHTML(s.stars);
+      if (s.hype !== prev.hype) {
+        const lv = st.hype < 0.3 ? 'var(--miss)' : st.hype < 0.7 ? 'var(--down)' : 'var(--perfect)';
+        segs.forEach((g, i) => { g.classList.toggle('on', i < s.hype); g.style.setProperty('--lv', lv); });
+      }
+      prev = s;
+      $('songBar').style.width = Math.max(0, Math.min(1, st.songTime / SONG.len)) * 100 + '%';
+      setMode(st.mode);
+    },
+  });
+  $('camBtn').addEventListener('click', e => { e.currentTarget.blur(); game.enableCamera(); });
+  if (!document.documentElement.classList.contains('lite')) game.enableCamera();
+</script>
+</body>
+</html>

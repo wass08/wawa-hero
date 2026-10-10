@@ -1,0 +1,28 @@
+{
+ "songs": [
+  {
+   "id": "system-online",
+   "title": "System Online",
+   "artist": "arabesquestreamingservice023",
+   "audio": "songs/system-online/audio.mp3",
+   "cover": "songs/system-online/cover.jpg",
+   "bpm": 126.0,
+   "duration": 183.52,
+   "energy": 2,
+   "moves": [
+    "up",
+    "down",
+    "clap",
+    "split_lu",
+    "split_ld",
+    "sweep"
+   ],
+   "photos": 4,
+   "preview": {
+    "start": 51.713,
+    "dur": 15.238
+   },
+   "chart": "songs/system-online/chart.json"
+  }
+ ]
+}

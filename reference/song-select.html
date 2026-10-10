@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Start · Song select — Block Party (working title)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="hud.css">
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+<style>
+  /* Start + song select live on the same 3D stage as gameplay. The camera moves between states:
+     title = close on the jumbotron (your camera), songs = wide key-art shot, countdown = gameplay angle.
+     Navigation uses the game's three moves: arms up = previous, arms down = next, clap = choose. */
+  .hud [data-show] { opacity: 0; visibility: hidden; transition: opacity 0.35s ease, visibility 0s linear 0.35s; }
+  .hud[data-state="title"] [data-show~="title"], .hud[data-state="songs"] [data-show~="songs"],
+  .hud[data-state="level"] [data-show~="level"], .hud[data-state="count"] [data-show~="count"] { opacity: 1; visibility: visible; transition-delay: 0s; }
+
+  /* title */
+  .brand { position: absolute; top: calc(var(--u) * 2.4); left: 50%; transform: translateX(-50%); text-align: center; }
+  .brand h1 { margin: 0; font-size: calc(var(--u) * 6.4); line-height: 0.95; letter-spacing: 0.03em; -webkit-text-stroke: calc(var(--u) * 0.45) var(--bg); paint-order: stroke fill; text-shadow: 0 0 calc(var(--u) * 2.4) color-mix(in oklch, var(--clap) 70%, transparent); }
+  .brand p { margin: calc(var(--u) * 1.2) 0 0; font: 500 calc(var(--u) * 1.3) var(--font-body); color: var(--fg); letter-spacing: 0.04em; }
+  .ready { position: absolute; left: 50%; bottom: calc(var(--u) * 10); transform: translateX(-50%); width: calc(var(--u) * 40); padding: calc(var(--u) * 1.5) calc(var(--u) * 1.8); }
+  .ready ul { list-style: none; margin: calc(var(--u) * 1) 0 0; padding: 0; display: grid; gap: calc(var(--u) * 0.8); font: 500 calc(var(--u) * 1.3) var(--font-body); }
+  .ready li { display: flex; align-items: center; gap: calc(var(--u) * 1); color: var(--muted); }
+  .ready li i { flex: none; width: calc(var(--u) * 1.4); height: calc(var(--u) * 1.4); box-shadow: inset 0 0 0 calc(var(--u) * 0.2) var(--muted); }
+  .ready li.ok { color: var(--fg); }
+  .ready li.ok i { background: var(--perfect); box-shadow: none; }
+
+  .cam { position: absolute; top: calc(var(--u) * 2); right: calc(var(--u) * 2); width: calc(var(--u) * 22); padding: calc(var(--u) * 1) calc(var(--u) * 1.2) calc(var(--u) * 1.1); display: grid; grid-template-columns: auto 1fr; gap: calc(var(--u) * 0.4) calc(var(--u) * 1); align-items: center; font-family: var(--font-body); }
+  .cam-dot { grid-row: span 2; width: calc(var(--u) * 1.2); height: calc(var(--u) * 1.2); background: var(--c, var(--muted)); }
+  .cam[data-s="live"] { --c: var(--miss); }
+  .cam b { font-weight: 600; font-size: calc(var(--u) * 1.15); }
+  .cam em { font-style: normal; font-size: calc(var(--u) * 0.95); color: var(--muted); }
+
+  /* shared buttons (mouse fallback) */
+  .ghost { pointer-events: auto; min-height: max(44px, calc(var(--u) * 3)); padding: 0 calc(var(--u) * 1.4); font: 600 calc(var(--u) * 1.05) var(--font-body); color: var(--fg); background: color-mix(in oklch, var(--fg) 10%, transparent); border: calc(var(--u) * 0.15) solid color-mix(in oklch, var(--fg) 40%, transparent); cursor: pointer; }
+  .ghost:hover { background: color-mix(in oklch, var(--fg) 20%, transparent); }
+  .cam .ghost { grid-column: 1 / -1; justify-self: start; margin-top: calc(var(--u) * 0.6); }
+  .ghost[hidden] { display: none; }
+  button:focus-visible, .row:focus-visible { outline: calc(var(--u) * 0.25) solid var(--fg); outline-offset: 2px; }
+
+  /* stepper */
+  .stepper { position: absolute; top: calc(var(--u) * 2.4); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: calc(var(--u) * 1); padding: calc(var(--u) * 0.9) calc(var(--u) * 1.6); font: 600 calc(var(--u) * 1.1) var(--font-body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .stepper b { width: calc(var(--u) * 2.4); height: 0; border-top: calc(var(--u) * 0.18) solid color-mix(in oklch, var(--fg) 25%, transparent); }
+  .stepper span.on { color: var(--fg); }
+
+  /* setlist */
+  .setlist { position: absolute; left: calc(var(--u) * 2); top: calc(var(--u) * 7.6); width: calc(var(--u) * 28); padding: calc(var(--u) * 1.4) calc(var(--u) * 1.2) calc(var(--u) * 1.2); }
+  .setlist-head { display: flex; justify-content: space-between; align-items: baseline; padding: 0 calc(var(--u) * 0.4) calc(var(--u) * 1); }
+  .setlist-head .meta { font: 500 calc(var(--u) * 0.9) var(--font-mono); color: var(--muted); }
+  .rows { list-style: none; margin: 0; padding: 0; display: grid; gap: calc(var(--u) * 0.45); }
+  .row { pointer-events: auto; cursor: pointer; display: grid; grid-template-columns: calc(var(--u) * 2.6) 1fr auto; align-items: center; gap: calc(var(--u) * 0.8); padding: calc(var(--u) * 0.85) calc(var(--u) * 1); color: var(--fg); transition: background 0.15s, transform 0.2s; }
+  .row:hover { background: color-mix(in oklch, var(--fg) 9%, transparent); }
+  .row .no { font: 500 calc(var(--u) * 1) var(--font-mono); color: var(--muted); }
+  .row .t { font-size: calc(var(--u) * 1.75); font-weight: 700; line-height: 1.05; }
+  .row .m { display: block; margin-top: calc(var(--u) * 0.25); font: 400 calc(var(--u) * 0.95) var(--font-body); color: var(--muted); }
+  .row.sel { background: var(--fg); color: var(--bg); }
+  .row.sel .no, .row.sel .m { color: color-mix(in oklch, var(--bg) 70%, transparent); }
+  .row.sel:hover { background: oklch(0.89 0.03 280); }
+  .pips { display: flex; gap: calc(var(--u) * 0.3); }
+  .pips i { width: calc(var(--u) * 0.8); height: calc(var(--u) * 0.8); background: color-mix(in oklch, currentColor 22%, transparent); }
+  .pips i.on { background: currentColor; }
+  .hud[data-state="level"] .row:not(.sel) { opacity: 0.4; }
+
+  /* detail */
+  .detail { position: absolute; right: calc(var(--u) * 2); top: calc(var(--u) * 7.6); width: calc(var(--u) * 28); padding: calc(var(--u) * 1.8) calc(var(--u) * 1.8) calc(var(--u) * 1.9); }
+  .detail h2 { margin: calc(var(--u) * 0.6) 0 0; font-size: calc(var(--u) * 3.2); line-height: 1; }
+  .artist { margin: calc(var(--u) * 0.5) 0 0; font: 400 calc(var(--u) * 1.15) var(--font-body); color: var(--muted); }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--u) * 1); margin: calc(var(--u) * 1.8) 0 0; padding: calc(var(--u) * 1.3) 0; border-block: calc(var(--u) * 0.12) solid color-mix(in oklch, var(--border) 90%, transparent); }
+  .stats dt { font: 600 calc(var(--u) * 0.85) var(--font-body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .stats dd { margin: calc(var(--u) * 0.4) 0 0; font-size: calc(var(--u) * 1.8); font-weight: 700; }
+  .feat { display: flex; justify-content: space-between; align-items: center; margin-top: calc(var(--u) * 1.3); }
+  .move-icons { display: flex; gap: calc(var(--u) * 0.9); }
+  .move-icons i { width: calc(var(--u) * 2.4); color: var(--c); }
+  .btn-play { pointer-events: auto; width: 100%; margin-top: calc(var(--u) * 1.8); min-height: max(48px, calc(var(--u) * 3.6)); font: 700 calc(var(--u) * 1.5) var(--font-display); color: var(--bg); background: var(--fg); border: 0; cursor: pointer; }
+  .btn-play:hover { background: oklch(0.88 0.03 280); }
+  .song-view, .level-view { display: none; }
+  .hud[data-state="songs"] .song-view, .hud[data-state="title"] .song-view, .hud[data-state="count"] .song-view { display: block; }
+  .hud[data-state="level"] .level-view { display: block; }
+  .levels { list-style: none; margin: calc(var(--u) * 1.6) 0 0; padding: 0; display: grid; gap: calc(var(--u) * 0.5); }
+  .levels .row { grid-template-columns: 1fr; padding: calc(var(--u) * 1) calc(var(--u) * 1.2); }
+  .levels .row.back .t { font-size: calc(var(--u) * 1.3); }
+
+  /* gesture legend — flashes when a move is recognised */
+  .legend { position: absolute; left: 50%; bottom: calc(var(--u) * 2); transform: translateX(-50%); display: flex; gap: calc(var(--u) * 0.8); }
+  .key { display: flex; align-items: center; gap: calc(var(--u) * 0.9); padding: calc(var(--u) * 0.8) calc(var(--u) * 1.4) calc(var(--u) * 0.8) calc(var(--u) * 1); transition: background 0.12s; }
+  .key svg { width: calc(var(--u) * 2.8); color: var(--c); }
+  .key div { display: grid; gap: calc(var(--u) * 0.25); }
+  .key b { font-size: calc(var(--u) * 1.3); font-weight: 700; line-height: 1; color: var(--c); }
+  .key span { font: 500 calc(var(--u) * 1.1) var(--font-body); color: var(--fg); line-height: 1; }
+  .key.hit { background: var(--c); }
+  .key.hit svg, .key.hit b, .key.hit span { color: var(--bg); }
+
+  .track { position: absolute; left: calc(var(--u) * 2); bottom: calc(var(--u) * 2); }
+  .lite .track, .lite .cam { display: none; }
+</style>
+</head>
+<body>
+<div id="stage" data-od-id="stage-3d" aria-label="3D stage behind the menu"></div>
+<div class="hud" id="hud" data-state="title" data-od-id="menu-hud">
+  <header class="brand" data-show="title" data-od-id="wordmark">
+    <h1>BLOCK PARTY</h1>
+    <p>The rhythm game you play with your arms</p>
+  </header>
+  <section class="ready panel" data-show="title" data-od-id="setup-checklist">
+    <span class="label">Get ready</span>
+    <ul><li id="chkDist"><i></i>Step back about 2 m from the screen</li><li id="chkBody"><i></i>Get your whole body on the big screen</li></ul>
+  </section>
+  <div class="cam panel" id="cam" data-s="avatar" data-show="title" data-od-id="jumbotron-status">
+    <span class="cam-dot"></span><b id="camTitle"></b><em id="camSub"></em>
+    <button type="button" class="ghost" id="camBtn" data-od-id="camera-toggle"></button>
+  </div>
+
+  <nav class="stepper panel" data-show="songs level" aria-label="Progress" data-od-id="stepper">
+    <span id="stSong">Song</span><b></b><span id="stLevel">Difficulty</span><b></b><span>Play</span>
+  </nav>
+  <section class="setlist panel" data-show="songs level" data-od-id="setlist">
+    <div class="setlist-head"><span class="label">Setlist</span><span class="meta">Placeholder tracks</span></div>
+    <ol class="rows" id="rows"></ol>
+  </section>
+  <section class="detail panel" data-show="songs level" data-od-id="song-detail">
+    <div class="song-view">
+      <span class="label">Selected</span>
+      <h2 id="dTitle"></h2>
+      <p class="artist" id="dArtist"></p>
+      <dl class="stats"><div><dt>BPM</dt><dd id="dBpm"></dd></div><div><dt>Length</dt><dd id="dLen"></dd></div><div><dt>Best</dt><dd id="dBest">—</dd></div></dl>
+      <div class="feat"><span class="label">Moves</span><div class="move-icons" id="dMoves"></div></div>
+      <div class="feat"><span class="label">Energy</span><div class="pips" id="dEnergy"></div></div>
+      <button type="button" class="btn-play" id="playBtn" data-od-id="cta-choose-song">Choose this song</button>
+    </div>
+    <div class="level-view">
+      <span class="label">Difficulty for</span>
+      <h2 id="lTitle"></h2>
+      <ol class="levels" id="levels"></ol>
+    </div>
+  </section>
+
+  <nav class="legend" id="legend" data-show="title songs level count" aria-label="Moves" data-od-id="gesture-legend"></nav>
+  <div class="track panel" data-show="title songs level" data-od-id="tracking-chip">
+    <span class="track-fig" id="trackFig"></span>
+    <span class="track-txt"><b>Full body in frame</b><em>Keys work too: ↑ ↓ Space</em></span>
+  </div>
+</div>
+<script type="module">
+  import { createGame, MOVES, P, css, drawIcon, iconSVG } from './rhythm-core.js';
+  const $ = id => document.getElementById(id);
+  const hud = $('hud');
+  const lite = new URLSearchParams(location.search).has('lite');
+
+  const SONGS = [
+    { title: 'Demo track',  artist: 'Demo chart · playable',  bpm: 116, len: '0:33', energy: 2, moves: ['up', 'down', 'clap'], accent: 'up' },
+    { title: 'Neon Stomp',  artist: 'Placeholder artist', bpm: 98,  len: '2:48', energy: 1, moves: ['up', 'down'],         accent: 'down' },
+    { title: 'Goalpost',    artist: 'Placeholder artist', bpm: 124, len: '3:05', energy: 2, moves: ['up', 'down', 'clap'], accent: 'up' },
+    { title: 'Clap Back',   artist: 'Placeholder artist', bpm: 132, len: '2:56', energy: 3, moves: ['up', 'clap'],         accent: 'clap' },
+    { title: 'Night Shift', artist: 'Placeholder artist', bpm: 108, len: '3:20', energy: 2, moves: ['up', 'down', 'clap'], accent: 'down' },
+    { title: 'Bit Crush',   artist: 'Placeholder artist', bpm: 140, len: '2:31', energy: 3, moves: ['up', 'down', 'clap'], accent: 'clap' },
+  ];
+  const LEVELS = [
+    { name: 'Easy',   desc: 'Arms up and down only · half the cues' },
+    { name: 'Normal', desc: 'All three moves' },
+    { name: 'Hard',   desc: 'All three moves · double claps' },
+    { name: 'Back to songs', back: true },
+  ];
+  const CAMS = {
+    title: { pos: [0, 2.0, 10.2], look: [0, 4.9, -6] },
+    songs: { pos: [0, 2.3, 13.5], look: [0, 5.4, -6] },
+    count: { pos: [0, 1.5, 11.5], look: [0, 3.3, -4] },
+  };
+  const LEGENDS = {
+    title: [['clap', 'Start']],
+    songs: [['up', 'Previous'], ['down', 'Next'], ['clap', 'Choose']],
+    level: [['up', 'Up'], ['down', 'Down'], ['clap', 'Confirm']],
+    count: [['up', 'Cancel']],
+  };
+  const store = {   // storage can throw in sandboxed previews — the menu must still run
+    get() { try { return JSON.parse(localStorage.getItem('bp.menu') || '{}'); } catch { return {}; } },
+    set(v) { try { localStorage.setItem('bp.menu', JSON.stringify(v)); } catch {} },
+  };
+  const saved = store.get();
+  let state = 'title', sel = saved.song ?? 0, lvl = saved.level ?? 1, countAt = 0, ready = false;
+
+  /* rows */
+  $('rows').innerHTML = SONGS.map((s, i) => `<li class="row" tabindex="-1" data-i="${i}"><span class="no">${String(i + 1).padStart(2, '0')}</span><span><span class="t">${s.title}</span><span class="m">${s.bpm} BPM · ${s.len}</span></span><span class="pips">${[1, 2, 3].map(n => `<i class="${n <= s.energy ? 'on' : ''}"></i>`).join('')}</span></li>`).join('');
+  $('levels').innerHTML = LEVELS.map((l, i) => `<li class="row${l.back ? ' back' : ''}" tabindex="-1" data-l="${i}"><span><span class="t">${l.name}</span>${l.desc ? `<span class="m">${l.desc}</span>` : ''}</span></li>`).join('');
+  $('trackFig').innerHTML = iconSVG('idle');
+  const rows = [...$('rows').children], lrows = [...$('levels').children];
+
+  function render() {
+    hud.dataset.state = state;
+    rows.forEach((r, i) => r.classList.toggle('sel', i === sel));
+    lrows.forEach((r, i) => r.classList.toggle('sel', i === lvl));
+    const s = SONGS[sel];
+    $('dTitle').textContent = $('lTitle').textContent = s.title;
+    $('dArtist').textContent = s.artist;
+    $('dBpm').textContent = s.bpm; $('dLen').textContent = s.len;
+    $('dMoves').innerHTML = s.moves.map(m => `<i style="--c: var(--${m})" title="${MOVES[m].label}">${iconSVG(m)}</i>`).join('');
+    $('dEnergy').innerHTML = [1, 2, 3].map(n => `<i class="${n <= s.energy ? 'on' : ''}"></i>`).join('');
+    $('stSong').classList.toggle('on', state === 'songs');
+    $('stLevel').classList.toggle('on', state === 'level');
+    $('legend').innerHTML = LEGENDS[state].map(([m, a]) => `<div class="key panel" data-m="${m}" style="--c: var(--${m})">${iconSVG(m)}<div><b>${MOVES[m].label}</b><span>${a}</span></div></div>`).join('');
+    store.set({ song: sel, level: lvl });
+  }
+  function go(next) {
+    state = next;
+    const cam = CAMS[next === 'level' ? 'songs' : next];
+    game.setCamera(cam.pos, cam.look);
+    game.setWall(next === 'title' ? 'cam' : 'canvas');
+    game.setBpm(SONGS[sel].bpm);
+    if (next === 'count') countAt = performance.now();
+    render();
+  }
+  function flash(m) {
+    const k = $('legend').querySelector(`[data-m="${m}"]`);
+    if (!k) return;
+    k.classList.add('hit'); setTimeout(() => k.classList.remove('hit'), 260);
+  }
+  function onMove(m) {
+    flash(m);
+    if (state === 'title') { if (m === 'clap' && ready) go('songs'); }
+    else if (state === 'songs') {
+      if (m === 'up') sel = (sel + SONGS.length - 1) % SONGS.length;
+      if (m === 'down') sel = (sel + 1) % SONGS.length;
+      if (m === 'back') return go('title');
+      if (m === 'clap') return go('level');
+      game.setBpm(SONGS[sel].bpm); render();
+    } else if (state === 'level') {
+      if (m === 'up') lvl = (lvl + LEVELS.length - 1) % LEVELS.length;
+      if (m === 'down') lvl = (lvl + 1) % LEVELS.length;
+      if (m === 'back') { lvl = 1; return go('songs'); }
+      if (m === 'clap') { if (LEVELS[lvl].back) { lvl = 1; return go('songs'); } return go('count'); }
+      render();
+    } else if (state === 'count' && (m === 'up' || m === 'back')) go('level');
+  }
+
+  /* LED wall painter: song cover, difficulty, countdown */
+  const maskC = document.createElement('canvas'); maskC.width = maskC.height = 6;
+  { const m = maskC.getContext('2d'); m.fillStyle = css([0.05, 0.02, 285], 0.4); m.fillRect(4, 0, 2, 6); m.fillRect(0, 4, 6, 2); }
+  let mask = null;
+  const FONT = '"Pixelify Sans", ui-monospace, monospace';
+  function drawWall(ctx, W, H, st) {
+    mask ??= ctx.createPattern(maskC, 'repeat');
+    const s = SONGS[sel], acc = MOVES[s.accent].c, pulse = Math.max(0, 1 - st.beatPhase * 3), t = performance.now() / 1000;
+    ctx.fillStyle = css([0.11, 0.06, 285]); ctx.fillRect(0, 0, W, H);
+    const cols = 44, cell = W / cols, rowsN = Math.floor(H / cell);
+    for (let c = 0; c < cols; c++) {
+      if (c >= 8 && c < cols - 8) continue;
+      const lit = Math.round((0.2 + 0.5 * Math.abs(Math.sin(t * 1.3 + c * 0.6)) + pulse * 0.25) * rowsN);
+      for (let r = 0; r < rowsN; r++) { ctx.fillStyle = r < lit ? css(acc, 0.85) : css(P.fg, 0.04); ctx.fillRect(c * cell + 2, H - (r + 1) * cell + 2, cell - 4, cell - 4); }
+    }
+    ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    const cx = W / 2;
+    if (state === 'count') {
+      const e = (performance.now() - countAt) / 1000, n = 3 - Math.floor(e / 0.8);
+      const txt = n > 0 ? String(n) : 'GO!', k = 1 + Math.max(0, 0.25 - (e % 0.8)) * 1.2;
+      ctx.save(); ctx.translate(cx, H * 0.62); ctx.scale(k, k);
+      ctx.font = `700 ${n > 0 ? 300 : 220}px ${FONT}`; ctx.fillStyle = n > 0 ? css(P.fg) : css(acc); ctx.fillText(txt, 0, 0);
+      ctx.restore();
+      ctx.font = `700 40px ${FONT}`; ctx.fillStyle = css(P.fg, 0.75); ctx.fillText(`${s.title.toUpperCase()} · ${LEVELS[lvl].name.toUpperCase()}`, cx, H * 0.8);
+    } else {
+      ctx.font = `700 34px ${FONT}`; ctx.fillStyle = css(acc); ctx.fillText(state === 'level' ? 'CHOOSE DIFFICULTY' : 'NOW SELECTED', cx, H * 0.17);
+      const k = 1 + pulse * 0.025;
+      ctx.save(); ctx.translate(cx, H * 0.43); ctx.scale(k, k);
+      ctx.font = `700 ${state === 'level' ? 104 : 136}px ${FONT}`; ctx.fillStyle = css(P.fg); ctx.fillText(s.title.toUpperCase(), 0, 0);
+      ctx.restore();
+      if (state === 'level') {
+        ctx.font = `700 92px ${FONT}`; ctx.fillStyle = LEVELS[lvl].back ? css(P.fg, 0.6) : css(acc); ctx.fillText(LEVELS[lvl].name.toUpperCase(), cx, H * 0.66);
+      } else {
+        ctx.font = `700 40px ${FONT}`; ctx.fillStyle = css(P.fg, 0.7); ctx.fillText(`${s.bpm} BPM`, cx, H * 0.57);
+        s.moves.forEach((m, i) => drawIcon(ctx, m, cx + (i - (s.moves.length - 1) / 2) * 110, H * 0.7, 74, css(MOVES[m].c)));
+      }
+    }
+    ctx.fillStyle = mask; ctx.fillRect(0, 0, W, H);
+  }
+
+  const CAM_COPY = {
+    avatar: ['Big screen: avatar cam', 'Your camera is off', 'Show my camera'],
+    requesting: ['Asking for camera…', 'Allow access in the browser prompt', ''],
+    live: ['Big screen: your camera', 'Shaded LED feed · mirrored', ''],
+    blocked: ['Camera blocked', 'Showing avatar cam instead', 'Try again'],
+    unavailable: ['No camera found', 'Showing avatar cam instead', ''],
+  };
+  function showCam(s) {
+    const [t, sub, btn] = CAM_COPY[s];
+    $('cam').dataset.s = s; $('camTitle').textContent = t; $('camSub').textContent = sub;
+    $('camBtn').textContent = btn; $('camBtn').hidden = !btn;
+  }
+  showCam('avatar');
+
+  const game = createGame({
+    container: $('stage'),
+    camera: { pos: CAMS.title.pos, target: CAMS.title.look, fov: 54 },
+    avatar: { x: 0, z: 0.6, scale: 1.45 },
+    wall: 'ambient', jumbotron: true, drawWall, wallBox: { w: 21, h: 7.8, y: 4.2, z: -6.2 },
+    crowd: true, crowdClearX: 2.4, beams: 0.35, menu: true,
+    onMove, onCam: showCam,
+    onFrame() {
+      if (state === 'count' && performance.now() - countAt > 3300) {
+        state = 'done';
+        if (!lite) location.href = 'gameplay-b-cue-rail-v2.html'; else go('songs');
+      }
+    },
+  });
+
+  /* mouse fallback */
+  rows.forEach((r, i) => r.addEventListener('click', () => { if (state !== 'songs') return; if (sel === i) go('level'); else { sel = i; game.setBpm(SONGS[sel].bpm); render(); } }));
+  lrows.forEach((r, i) => r.addEventListener('click', () => { if (state !== 'level') return; lvl = i; onMove('clap'); }));
+  $('playBtn').addEventListener('click', () => state === 'songs' && go('level'));
+  $('camBtn').addEventListener('click', e => { e.currentTarget.blur(); game.enableCamera(); });
+
+  /* simulated setup check — the real build gates on MediaPipe seeing all 33 landmarks */
+  setTimeout(() => $('chkDist').classList.add('ok'), 900);
+  setTimeout(() => { $('chkBody').classList.add('ok'); ready = true; }, 1700);
+
+  go('title');
+  const deep = new URLSearchParams(location.search).get('state');   // e.g. ?state=songs for review links
+  if (deep === 'songs' || deep === 'level') { ready = true; go(deep); const c = CAMS.songs; game.setCamera(c.pos, c.look, true); }
+  if (lite) {   // overview thumbnail: tour the menu on its own
+    setTimeout(() => { ready = true; go('songs'); }, 2500);
+    setInterval(() => state === 'songs' && onMove('down'), 2200);
+  } else game.enableCamera();
+</script>
+</body>
+</html>

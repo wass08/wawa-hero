@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WAWA HERO · results (1P) mock</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@500;700&family=Rubik:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="mock.css">
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute">
+  <symbol id="star" viewBox="0 0 11 11"><path fill="currentColor" d="M5 0h1v2h1v2h2v1h2v1H9v1H8v1h1v2H8v1H7v-1H6V9H5v1H4v1H3V9H2V7h1V6H2V5H0V4h2V3h1V2h1V0h1z"/></symbol>
+  <symbol id="dl" viewBox="0 0 16 16"><path fill="currentColor" d="M7 1h2v7h2v1h-1v1h-1v1H9v1H7v-1H6v-1H5V9H4V8h2V1zM2 12h2v2h8v-2h2v4H2z"/></symbol>
+  <symbol id="globe" viewBox="0 0 16 16"><path fill="currentColor" d="M5 1h6v1h2v2h1v6h-1v2h-2v1H5v-1H3v-2H2V4h1V2h2zm0 2v2h2V3zm4 0v2h2V3zM3 6v4h2V6zm4 0v4h2V6zm4 0v4h2V6zM5 11v2h2v-2zm4 0v2h2v-2z"/></symbol>
+  <symbol id="chev" viewBox="0 0 16 16"><path fill="currentColor" d="M3 5h2v2h2v2h2V7h2V5h2v2h-2v2H9v2H7V9H5V7H3z"/></symbol>
+</svg>
+<div class="stage"><div class="beam b1"></div><div class="beam b2"></div><div class="floor"></div></div>
+
+<main class="panel results">
+  <header class="rs-head">
+    <span class="kicker">Set complete · <b>Showtime</b></span>
+    <span class="song">1:44 · 108 BPM</span>
+  </header>
+
+  <section class="score-zone one">
+    <div class="score-card p1">
+      <div class="points">42,680 <span class="new-best">NEW BEST</span></div>
+      <div class="stars"><svg class="on"><use href="#star"/></svg><svg class="on"><use href="#star"/></svg><svg class="on"><use href="#star"/></svg></div>
+    </div>
+    <dl class="stat-row">
+      <div class="stat"><dt>Max combo</dt><dd>64</dd></div>
+      <div class="stat"><dt>Perfect</dt><dd class="perfect">92</dd></div>
+      <div class="stat"><dt>Good</dt><dd class="good">12</dd></div>
+      <div class="stat"><dt>Miss</dt><dd class="miss">3</dd></div>
+      <div class="stat"><dt>Burned</dt><dd>12.8<small>kcal</small></dd></div>
+    </dl>
+  </section>
+
+  <section class="save-zone">
+    <div class="save-grid one">
+      <div class="identity p1">
+        <label class="field"><span class="lbl">Hero name <em>up to 16 letters</em></span>
+          <div class="input focus"><span>PIXEL KAI</span><span class="caret"></span><span class="count">9/16</span></div>
+        </label>
+        <label class="field"><span class="lbl">Country <em>optional</em></span>
+          <div class="input combo"><span class="flag" style="--flag:hsl(338 55% 34%)">JP</span><span>Japan</span><svg class="chev"><use href="#chev"/></svg></div>
+        </label>
+      </div>
+    </div>
+
+    <div class="photos">
+      <div class="photos-head"><span class="lbl">Your 4 photos</span><span class="hint">Click one to leave it out</span></div>
+      <div class="photo-row">
+        <figure class="shot"><img src="img/shot-1.png" alt=""><span class="n">1</span><span class="t">0:34</span></figure>
+        <figure class="shot"><img src="img/shot-2.png" alt=""><span class="n">2</span><span class="t">0:58</span></figure>
+        <figure class="shot"><img src="img/shot-3.png" alt=""><span class="n">3</span><span class="t">1:21</span></figure>
+        <figure class="shot"><img src="img/shot-4.png" alt=""><span class="n">4</span><span class="t">1:40</span></figure>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn">Save with photos</button>
+      <button class="btn ghost">Save score only</button>
+      <span class="spacer"></span>
+      <button class="btn ghost"><svg class="ico"><use href="#dl"/></svg>Download all</button>
+      <button class="btn link">Don't save</button>
+    </div>
+    <p class="consent"><svg><use href="#globe"/></svg><span><b>Save with photos</b> puts these 4 photos on the public Wall of Heroes with your name, flag and score. <b>Save score only</b> keeps them on this laptop.</span></p>
+  </section>
+</main>
+</body>
+</html>

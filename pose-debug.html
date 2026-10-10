@@ -1,0 +1,239 @@
+<!doctype html>
+<!--
+  Pose debug page (dev only: `npm run dev`, open /pose-debug.html; add ?auto&players=2&model=lite).
+
+  RECORDER — turn a real failing attempt into a regression test:
+   1. Click "Record", perform the move(s) (both players are captured in 2P mode). After N seconds a
+      JSON file downloads: raw MediaPipe landmarks per frame (unmirrored) with performance.now()
+      timestamps, plus the live scores / upperArmAngle for reference (format: src/pose/replay.js).
+   2. Copy it to tests/pose/recordings/<name>.json and add an "expect" block, times in seconds from the
+      recording's first frame:
+        "expect": { "player": 0, "songStart": 0,
+                    "notes": [{ "t": 2.1, "move": "split_lu" }, { "t": 4.0, "move": "sweep", "dur": 1.5 }],
+                    "results": ["perfect", ["perfect", "good"]] }
+      (tip: replayRecording(rec).frames shows when each score rose, to place the note times.)
+   3. `npx vitest run tests/pose/recordings` replays it through the analyzer + judge.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Pose debug — Wawa Hero</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  :root { color-scheme: dark; font-family: ui-monospace, Menlo, monospace; --p1: oklch(0.84 0.14 205); --p2: oklch(0.70 0.25 345); }
+  body { margin: 0; background: #0b0b12; color: #ddd; padding: 12px; }
+  header { display: flex; gap: 12px; align-items: center; margin-bottom: 8px; flex-wrap: wrap; }
+  h1 { font-size: 14px; margin: 0; color: #fff; }
+  main { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-start; }
+  canvas { background: #000; border: 1px solid #333; width: min(62vw, 960px); height: auto; }
+  .players { display: flex; gap: 12px; flex-wrap: wrap; }
+  .player { min-width: 300px; border-top: 3px solid var(--c); padding-top: 4px; }
+  .player h2 { margin: 0 0 4px; font-size: 13px; color: var(--c); }
+  .big { font-size: 30px; font-weight: bold; color: #fff; min-height: 38px; }
+  .row { display: grid; grid-template-columns: 74px 1fr 40px; align-items: center; gap: 6px; margin: 3px 0; font-size: 12px; }
+  .bar { height: 12px; background: #222; position: relative; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; background: var(--c); opacity: .75; }
+  .bar > b { position: absolute; top: -2px; bottom: -2px; width: 1px; background: #f55; }
+  .row.best .bar > i { opacity: 1; background: #fff; }
+  .sweep { margin: 6px 0; font-size: 12px; }
+  .sweep .gauge { height: 10px; background: #222; position: relative; margin-top: 3px; }
+  .sweep .gauge > i { position: absolute; inset: 0 auto 0 0; background: oklch(0.82 0.11 300); }
+  pre { margin: 4px 0; font-size: 11px; color: #aaa; white-space: pre; }
+  button, select { font: inherit; }
+  #status { color: #aaa; font-size: 12px; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Pose debug</h1>
+    <select id="model"><option>full</option><option>lite</option></select>
+    <button id="start">start camera</button>
+    <label><input type="radio" name="np" value="1" checked /> 1P</label>
+    <label><input type="radio" name="np" value="2" /> 2P</label>
+    <label><input type="checkbox" id="showVideo" checked /> video</label>
+    <button id="rec">Record</button> <input id="recSecs" type="number" value="10" min="1" max="120" style="width:4em" /> s
+    <span id="recStatus"></span>
+    <span id="status"></span>
+  </header>
+  <main>
+    <canvas id="cv" width="960" height="540"></canvas>
+    <div class="players" id="players"></div>
+  </main>
+  <p style="font-size:11px;color:#777">Mirrored view: your LEFT arm is on screen-left. P1 = person on screen-left (cyan), P2 = screen-right (magenta).
+  Red line = judge onset threshold. Sweep: raise both arms HIGH to arm a practice sweep (HIGH → T → LOW out to the sides, upper arms only).
+  Thresholds: POSE_CONFIG (src/pose/config.js; also window.POSE_CONFIG). URL: ?auto&amp;players=2&amp;model=lite</p>
+<script type="module">
+import { createPoseTracker, POSE_CONFIG, SCORE_KEYS, argmaxMove, createSweepPractice, createPoseRecorder } from '/src/pose/index.js';
+
+window.POSE_CONFIG = POSE_CONFIG;
+window.poseDebug = {};
+const COLORS = ['oklch(0.84 0.14 205)', 'oklch(0.70 0.25 345)'];
+const cv = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const statusEl = document.getElementById('status');
+const video = document.createElement('video');
+video.playsInline = true; video.muted = true;
+
+// ---- per-player panels
+const panels = [0, 1].map((p) => {
+  const el = document.createElement('div');
+  el.className = 'player';
+  el.style.setProperty('--c', COLORS[p]);
+  el.innerHTML = `<h2>P${p + 1}</h2><div class="big">—</div><div class="bars"></div>
+    <div class="sweep">sweep phase: <b class="phase">—</b> · practice: <b class="prac">idle</b>
+      <div class="gauge"><i style="width:0"></i></div></div><pre class="info"></pre>`;
+  document.getElementById('players').appendChild(el);
+  const rows = {};
+  for (const k of SCORE_KEYS) {
+    const r = document.createElement('div');
+    r.className = 'row';
+    r.innerHTML = `<span>${k}</span><div class="bar"><i></i><b style="left:${POSE_CONFIG.judge.on * 100}%"></b></div><span>0</span>`;
+    el.querySelector('.bars').appendChild(r);
+    rows[k] = { r, fill: r.querySelector('i'), val: r.querySelectorAll('span')[1] };
+  }
+  return {
+    el, rows, big: el.querySelector('.big'), info: el.querySelector('.info'), phase: el.querySelector('.phase'),
+    prac: el.querySelector('.prac'), gauge: el.querySelector('.gauge > i'), practice: createSweepPractice(),
+  };
+});
+
+const BONES = [[11,12],[11,13],[13,15],[12,14],[14,16],[11,23],[12,24],[23,24],[23,25],[25,27],[24,26],[26,28],[15,19],[16,20],[0,11],[0,12]];
+let tracker = null;
+let players = 1;
+const setPlayersUI = () => { panels[1].el.style.display = players === 2 ? '' : 'none'; };
+setPlayersUI();
+
+for (const r of document.querySelectorAll('input[name=np]')) {
+  r.onchange = async () => {
+    players = Number(r.value); setPlayersUI();
+    for (const p of panels) p.practice.reset();
+    if (tracker) await tracker.setMaxPlayers(players);
+  };
+}
+
+document.getElementById('start').onclick = async () => {
+  if (tracker) { tracker.close(); tracker = null; }
+  const stream = video.srcObject || await navigator.mediaDevices.getUserMedia({
+    video: { width: { ideal: 1280 }, height: { ideal: 720 }, facingMode: 'user' }, audio: false });
+  video.srcObject = stream;
+  await video.play();
+  cv.width = video.videoWidth; cv.height = video.videoHeight;
+  tracker = await createPoseTracker({
+    video, maxPlayers: players, model: document.getElementById('model').value,
+    onStatus: (s, d) => { statusEl.textContent = `status: ${s} ${d ? JSON.stringify(d.message ?? d) : ''}`; },
+  });
+  window.poseDebug.tracker = tracker;
+};
+
+function drawSkeleton(frame, color) {
+  const W = cv.width, H = cv.height, lm = frame.landmarks; // already mirrored
+  ctx.lineWidth = 4;
+  for (const [a, b] of BONES) {
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = Math.min(lm[a].visibility, lm[b].visibility) > 0.5 ? 1 : 0.25;
+    ctx.beginPath(); ctx.moveTo(lm[a].x * W, lm[a].y * H); ctx.lineTo(lm[b].x * W, lm[b].y * H); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  // upper arms highlighted (the sweep uses only these)
+  ctx.lineWidth = 9; ctx.strokeStyle = 'rgba(255,255,255,0.55)';
+  for (const [a, b] of [[11, 13], [12, 14]]) {
+    ctx.beginPath(); ctx.moveTo(lm[a].x * W, lm[a].y * H); ctx.lineTo(lm[b].x * W, lm[b].y * H); ctx.stroke();
+  }
+  for (let i = 0; i < 33; i++) {
+    ctx.fillStyle = lm[i].visibility > 0.5 ? '#fff' : '#555';
+    ctx.fillRect(lm[i].x * W - 3, lm[i].y * H - 3, 6, 6);
+  }
+  ctx.fillStyle = color; ctx.font = 'bold 22px monospace';
+  ctx.fillText(`P${frame.player + 1}`, lm[0].x * W - 14, lm[0].y * H - 30);
+  ctx.font = '16px monospace';
+  ctx.fillText('L', lm[13].x * W - 18, lm[13].y * H);
+  ctx.fillText('R', lm[14].x * W + 8, lm[14].y * H);
+}
+
+function panelUpdate(p, frame, tSec) {
+  const P = panels[p];
+  if (!frame) { P.big.textContent = '—'; P.info.textContent = ''; return; }
+  const best = argmaxMove(frame.scores);
+  for (const k of SCORE_KEYS) {
+    const v = frame.scores[k];
+    P.rows[k].fill.style.width = `${(v * 100).toFixed(0)}%`;
+    P.rows[k].val.textContent = v.toFixed(2);
+    P.rows[k].r.classList.toggle('best', k === best.move && v >= POSE_CONFIG.judge.on);
+  }
+  P.big.textContent = !frame.tracked ? 'not visible' : best.score >= POSE_CONFIG.judge.on ? best.move.toUpperCase() : '—';
+  const pr = P.practice.update(frame, tSec);
+  P.phase.textContent = pr.phase.toUpperCase();
+  P.prac.textContent = pr.active ? `active ${(pr.progress * 100).toFixed(0)}%` : pr.last ? `last: ${pr.last.result}${pr.last.reason ? ` (${pr.last.reason})` : ''} off ${pr.last.off?.toFixed(2)}` : 'idle';
+  P.gauge.style.width = `${(pr.progress * 100).toFixed(0)}%`;
+  const deg = (r) => (r * 180 / Math.PI).toFixed(0).padStart(4);
+  const d = frame.debug;
+  P.info.textContent =
+    `tracked ${frame.tracked}  upper ${frame.upperBody}  full ${frame.fullBody}  src ${frame.source}\n` +
+    `upperArm  L ${deg(frame.upperArmAngle.left)}°  R ${deg(frame.upperArmAngle.right)}°  (0 hang, 90 T, ±180 up, − across)\n` +
+    `elbowVis  L ${frame.elbowVis.left.toFixed(2)}  R ${frame.elbowVis.right.toFixed(2)}   armVis L ${frame.armVis.left.toFixed(2)} R ${frame.armVis.right.toFixed(2)}\n` +
+    `armAngle  L ${deg(frame.armAngle.left)}°  R ${deg(frame.armAngle.right)}°   elbowStr L ${frame.elbowStraight.left.toFixed(2)} R ${frame.elbowStraight.right.toFixed(2)}\n` +
+    `energy ${frame.energy.toFixed(2)}   frame age ${(performance.now() - frame.t).toFixed(0)} ms\n` +
+    (d ? `wristDist ${d.wristDist.toFixed(2)} sw  cross ${d.cross.toFixed(2)}\n` +
+      ['left', 'right'].map((k) => `${k.padEnd(5)} elev ${d[k].elev.toFixed(0).padStart(4)}°  fore∠up ${d[k].forearmFromUp.toFixed(0).padStart(4)}°  elbow ${d[k].elbow.toFixed(0).padStart(4)}°`).join('\n') : '');
+}
+
+// ---- recorder
+let recording = null; // { rec, until }
+const recBtn = document.getElementById('rec'), recStatus = document.getElementById('recStatus');
+recBtn.onclick = () => {
+  if (!tracker) { recStatus.textContent = 'start the camera first'; return; }
+  if (recording) { finishRecording(); return; }
+  const secs = Math.max(1, Math.min(120, Number(document.getElementById('recSecs').value) || 10));
+  recording = {
+    rec: createPoseRecorder({ aspect: tracker.aspect, model: tracker.stats.model, maxPlayers: players, note: `${secs}s from pose-debug.html` }),
+    until: performance.now() + secs * 1000,
+  };
+  recBtn.textContent = 'Stop';
+};
+function finishRecording() {
+  const data = recording.rec.finish({ userAgent: navigator.userAgent });
+  recording = null; recBtn.textContent = 'Record';
+  const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pose-rec-${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  recStatus.textContent = `saved ${data.frames.length} frames`;
+}
+
+function loop(now) {
+  const frames = tracker ? tracker.updateAll(now) : [null, null];
+  if (recording) {
+    const t = Math.max(frames[0]?.t ?? -Infinity, frames[1]?.t ?? -Infinity);
+    if (Number.isFinite(t)) recording.rec.add(t, tracker.lastRaw, frames);
+    recStatus.textContent = `● REC ${((recording.until - now) / 1000).toFixed(1)} s · ${recording.rec.count} frames`;
+    if (now >= recording.until) finishRecording();
+  }
+  const W = cv.width, H = cv.height;
+  if (document.getElementById('showVideo').checked && video.readyState >= 2) {
+    ctx.save(); ctx.translate(W, 0); ctx.scale(-1, 1); ctx.drawImage(video, 0, 0, W, H); ctx.restore();
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(0, 0, W, H);
+  } else { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H); }
+  for (let p = 0; p < 2; p++) {
+    const f = frames[p];
+    if (f && f.landmarks) drawSkeleton(f, COLORS[p]);
+    if (p < players) panelUpdate(p, f, now / 1000);
+  }
+  if (tracker) {
+    const s = tracker.stats;
+    const st = `delegate ${s.delegate}  model ${s.model}  players ${s.maxPlayers}  poses ${s.poses}  detect ${s.detectMs.toFixed(1)} ms  fps ${s.fps.toFixed(1)}`;
+    if (!statusEl.textContent.startsWith('status: error')) statusEl.textContent = st;
+  }
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// ?auto[&players=2][&model=lite] starts the camera immediately (also used for headless smoke tests)
+const q = new URLSearchParams(location.search);
+if (q.has('model')) document.getElementById('model').value = q.get('model');
+if (q.get('players') === '2') { players = 2; document.querySelector('input[name=np][value="2"]').checked = true; setPlayersUI(); }
+if (q.has('auto')) document.getElementById('start').click();
+</script>
+</body>
+</html>

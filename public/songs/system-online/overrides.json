@@ -1,0 +1,87 @@
+{
+ "version": 1,
+ "_doc": "Hand-authored pins (one chart per song: each pin's \"notes\" list) for system-online. Times are seconds in audio.mp3, snapped to the detected half-beat grid (126 BPM, first downbeat 0.284 s). Vocal command times were found by faster-whisper word timestamps + MMS forced alignment on a demucs vocal stem; see tools/chart/README.md.",
+ "analysis": {"bpm": 126.0, "offset": 0.284},
+ "preview": {"start": 51.713, "bars": 8, "why": "chorus 1 from its downbeat ('Arms. Up.'), 8 bars = commands + Overload"},
+ "photos": [
+  {"t": 65.046, "why": "bar 34: right after chorus 1's 'Overload' sweep: breakdown, drums drop out"},
+  {"t": 122.189, "why": "bar 64: bridge, last bar (riser before chorus 2)"},
+  {"t": 139.332, "why": "bar 73: the drop hits"},
+  {"t": 160.284, "why": "bar 84: outro, the bar before 'Sequence complete.'"}
+ ],
+ "camera": [
+  {"t": 13.617, "shot": "orbit", "ease": 2.0, "why": "bar 7: intro: slow orbit as 'Begin sequence' ends"},
+  {"t": 21.236, "shot": "front", "ease": 1.9, "why": "bar 11: beat enters (build): glide to gameplay framing"},
+  {"t": 28.855, "shot": "low_left", "ease": 1.2, "why": "bar 15: build, second half"},
+  {"t": 36.474, "shot": "low_right", "ease": 0, "why": "bar 19: verse 'Power up' + drums hit: cut"},
+  {"t": 44.094, "shot": "high", "ease": 1.2, "why": "bar 23: verse, second half"},
+  {"t": 51.713, "shot": "close", "ease": 0, "until": 59.332, "why": "bar 27: chorus 1 commands 'Arms. Up.': cut close so the player sees themselves"},
+  {"t": 61.236, "shot": "drop", "ease": 0, "why": "bar 32: 'Overload': push-in"},
+  {"t": 65.046, "shot": "high", "ease": 2.0, "why": "bar 34: breakdown, drums out"},
+  {"t": 70.76, "shot": "orbit", "ease": 0, "why": "bar 37: instrumental glitch-synth solo entry: cut to orbit"},
+  {"t": 78.379, "shot": "high", "ease": 1.5, "why": "bar 41: solo, second half: crane"},
+  {"t": 85.998, "shot": "wide", "ease": 2.0, "why": "bar 45: break"},
+  {"t": 93.617, "shot": "low_left", "ease": 2.0, "why": "bar 49: break, drums thin out"},
+  {"t": 112.665, "shot": "close", "ease": 1.0, "why": "bar 59: bridge 'Full extension, top to floor': watch the sweeps"},
+  {"t": 120.284, "shot": "high", "ease": 1.5, "why": "bar 63: riser before chorus 2"},
+  {"t": 124.094, "shot": "close", "ease": 0, "until": 131.713, "why": "bar 65: chorus 2 commands: cut close"},
+  {"t": 131.713, "shot": "high", "ease": 1.5, "why": "bar 69: 'Overload' 2 + riser"},
+  {"t": 139.332, "shot": "drop", "ease": 0, "why": "bar 73: the drop"},
+  {"t": 146.951, "shot": "low_left", "ease": 0, "why": "bar 77: drop, 4 bars in"},
+  {"t": 154.57, "shot": "low_right", "ease": 0, "why": "bar 81: drop, 8 bars in"},
+  {"t": 162.189, "shot": "high", "ease": 1.0, "why": "bar 85: 'Sequence complete.'"}
+ ],
+ "sections": [
+  {"start": 59.3, "end": 70.8, "label": "breakdown", "why": "'Overload' + stutter, drums out"},
+  {"start": 70.8, "end": 86.0, "label": "instrumental", "why": "glitch synth solo"},
+  {"start": 101.2, "end": 112.7, "label": "build"},
+  {"start": 112.7, "end": 124.1, "label": "bridge", "why": "'Full extension, top to floor / Execute the sweep once more'"},
+  {"start": 139.3, "end": 166.0, "label": "drop"},
+  {"start": 166.0, "end": 183.6, "label": "outro", "why": "after 'Sequence complete', power-down from ~178 s"}
+ ],
+ "noNotes": [
+  {"start": 0, "end": 21.0, "why": "spoken intro 'System online. Begin sequence.' + ambient pads"},
+  {"start": 161.9, "end": 164.1, "why": "'Sequence complete.' vocal"}
+ ],
+ "pins": [
+  {
+   "label": "chorus 1 (vocal commands 51.7-59.3 s, 'Overload' 62.2-65.0 s)",
+   "start": 51.236, "end": 65.998, "snap": "half",
+   "notes": [
+    {"t": 51.951, "move": "up", "lyric": "Arms. UP."},
+    {"t": 53.141, "move": "down", "lyric": "Arms. DOWN."},
+    {"t": 53.617, "move": "clap", "lyric": "CLAP. (1st sung clap)"},
+    {"t": 53.855, "move": "clap", "lyric": "CLAP. (2nd sung clap, half a beat later: clap pairs may be half a beat apart)"},
+    {"t": 55.046, "move": "clap", "lyric": "Reboot. NOW."},
+    {"t": 55.76, "move": "split_lu", "lyric": "Left UP. (Right down.)"},
+    {"t": 57.427, "move": "clap", "lyric": "SWITCH. Mode."},
+    {"t": 58.141, "move": "split_ld", "lyric": "Right UP. (Left down.)"},
+    {"t": 62.189, "move": "sweep", "durBeats": 4, "lyric": "OVERLOAD"}
+   ]
+  },
+  {
+   "label": "bridge ('Full extension, top to floor / Execute the sweep once more' 112.6-119.4 s)",
+   "start": 111.713, "end": 120.284, "snap": "half",
+   "notes": [
+    {"t": 112.665, "move": "up", "lyric": "FULL extension"},
+    {"t": 114.332, "move": "sweep", "durBeats": 4, "lyric": "TOP to floor"},
+    {"t": 118.141, "move": "sweep", "durBeats": 3, "lyric": "execute the SWEEP once more"}
+   ]
+  },
+  {
+   "label": "chorus 2 (vocal commands 124.1-131.7 s, 'Overload' 134.6 s)",
+   "start": 123.617, "end": 136.474, "snap": "half",
+   "notes": [
+    {"t": 124.332, "move": "up", "lyric": "Arms. UP."},
+    {"t": 125.522, "move": "down", "lyric": "Arms. DOWN."},
+    {"t": 125.998, "move": "clap", "lyric": "CLAP. (1st sung clap)"},
+    {"t": 126.236, "move": "clap", "lyric": "CLAP. (2nd sung clap, half a beat later: clap pairs may be half a beat apart)"},
+    {"t": 127.427, "move": "clap", "lyric": "Reboot. NOW."},
+    {"t": 128.141, "move": "split_lu", "lyric": "Left UP. (Right down.)"},
+    {"t": 129.808, "move": "clap", "lyric": "SWITCH. Mode."},
+    {"t": 130.522, "move": "split_ld", "lyric": "Right UP. (Left down.)"},
+    {"t": 134.57, "move": "sweep", "durBeats": 4, "lyric": "OVERLOAD"}
+   ]
+  }
+ ]
+}
