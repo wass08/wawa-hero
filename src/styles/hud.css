@@ -264,7 +264,7 @@ input,select { pointer-events:auto; }
 .hud-back .pixel-arrow { width:calc(var(--u)*2.8);fill:currentColor;stroke:none;shape-rendering:crispEdges; }
 
 .wall-gallery { top:calc(var(--u)*15);width:calc(var(--u)*20);padding:calc(var(--u)*.5);display:grid;row-gap:calc(var(--u)*1.25); }
-.wall-gallery>.label { display:block;line-height:1.2; }
+.wall-gallery>.label { display:block;justify-self:start;line-height:1.2;position:relative;z-index:1;padding:calc(var(--u)*.45) calc(var(--u)*.8);color:var(--fg);background:color-mix(in oklch, var(--bg) 82%, transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);box-shadow:inset 0 0 0 calc(var(--u)*.12) color-mix(in oklch, var(--border) 85%, transparent);clip-path:polygon(var(--step) 0,calc(100% - var(--step)) 0,100% var(--step),100% calc(100% - var(--step)),calc(100% - var(--step)) 100%,var(--step) 100%,0 calc(100% - var(--step)),0 var(--step)); }
 #playerWall { margin-top:0; }
 .playing .rail { bottom:calc(var(--u)*2); }
 .playing .song { top:calc(var(--u)*2); }

@@ -67,12 +67,12 @@ it.skipIf(!chrome)('paints menu walls before the first frame with and without a 
     review.update(0);labels.inspector=document.querySelector('.review-note-move').textContent;
     const oldLook=stage.jumboLook;stage.setMenuCamera(true);
     const photo=await stage.captureJumbotron();const dimensions=await createImageBitmap(photo);
-    const capture={width:dimensions.width,height:dimensions.height,type:photo.type,look:stage.jumboLook,mix:stage.wallDebug.mix};dimensions.close();
+    const capture={width:dimensions.width,height:dimensions.height,type:photo.type,size:photo.size,look:stage.jumboLook,mix:stage.wallDebug.mix};dimensions.close();
     return {rows,frames,labels,instruction,capture,oldLook,legendMoves,backBadges};
   })()`;
   const result=await new Promise((resolve,reject)=>{ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(m.id===1){if(m.error||m.result.exceptionDetails)reject(Error(JSON.stringify(m)));else resolve(m.result.result.value);}});ws.send(JSON.stringify({id:1,method:'Runtime.evaluate',params:{expression,awaitPromise:true,returnByValue:true}}));});
   expect(result.legendMoves).toEqual({songs:['split_lu','split_ld','clap'],tutorial:['split_lu','split_ld','clap'],count:['down']});expect(result.backBadges).toEqual(['down','down']);
-  expect(result.capture).toMatchObject({width:640,height:360,type:'image/webp',mix:1});expect(result.capture.look).toEqual(result.oldLook);expect(result.oldLook).toMatchObject({tones:10,rows:100});
+  expect(result.capture).toMatchObject({width:960,height:540,type:'image/webp',mix:1});expect(result.capture.size).toBeLessThanOrEqual(200*1024);expect(result.capture.look).toEqual(result.oldLook);expect(result.oldLook).toMatchObject({tones:10,rows:100});
   for(const [surface,label] of Object.entries(result.labels))expect(label,surface).toBe('RIGHT UP');
   expect(result.instruction).toBe('Right forearm up, left forearm down');
   expect(result.frames).toBe(1);expect(result.rows).toHaveLength(4);

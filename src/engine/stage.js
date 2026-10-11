@@ -372,7 +372,7 @@ export function createStage(opts) {
   const heroPixels=new Uint8Array(1280*720*4),heroCanvas=document.createElement('canvas');heroCanvas.width=1280;heroCanvas.height=720;
   const heroCtx=heroCanvas.getContext('2d'),heroImage=heroCtx.createImageData(1280,720);
   let jumboPanels=null;
-  function captureJumbotron({look=JUMBO_LOOK.photo,width=640,height=360,type='image/webp'}={}) {
+  function captureJumbotron({look=JUMBO_LOOK.photo,width=960,height=540,type='image/webp',maxBytes=180*1024}={}) {
     const previous=renderer.getRenderTarget(),uniforms=jumbo.material.uniforms,old=readJumboLook(uniforms),mix=uniforms.menuMix.value;
     applyJumboLook(uniforms,look);uniforms.menuMix.value=0;
     renderer.setRenderTarget(heroRT);renderer.render(heroScene,heroCamera);
@@ -384,7 +384,17 @@ export function createStage(opts) {
     // consecutive captures cannot overwrite an earlier pending photo.
     const output=document.createElement('canvas');output.width=width;output.height=height;
     output.getContext('2d').drawImage(heroCanvas,0,0,width,height);
-    return new Promise(resolve=>output.toBlob(resolve,type,.88));
+    const encode=(canvas,quality)=>new Promise(resolve=>canvas.toBlob(resolve,type,quality));
+    if(type!=='image/webp')return encode(output,.88);
+    // The LED dot pattern is detailed, so step quality down to stay under the
+    // scoreboard's 200 KB upload limit, and only shrink the frame as a last resort.
+    return (async()=>{
+      let blob=null;
+      for(const quality of [.88,.8,.7,.6]){blob=await encode(output,quality);if(!blob||blob.size<=maxBytes)return blob;}
+      const small=document.createElement('canvas');small.width=Math.round(width*2/3);small.height=Math.round(height*2/3);
+      small.getContext('2d').drawImage(heroCanvas,0,0,small.width,small.height);
+      return (await encode(small,.8))||blob;
+    })();
   }
   function renderJumboPanels() {
     const uniforms=jumbo.material.uniforms,old=readJumboLook(uniforms),mix=uniforms.menuMix.value;
