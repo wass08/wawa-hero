@@ -1,4 +1,8 @@
+[![Wawa Hero](public/og.jpg)](https://hero.wawasensei.dev)
+
 # WAWA HERO
+
+**[▶ Play now at hero.wawasensei.dev](https://hero.wawasensei.dev)**: allow your camera, step back about 2 m, and dance.
 
 A webcam dance rhythm game: a voxel concert stage in Three.js, with your moves tracked by MediaPipe Pose. Dance the cues on the rail, strike a pose at the photo cues, burn calories, and post to the Wall of Heroes. 1 or 2 players (local versus).
 
