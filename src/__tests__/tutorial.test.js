@@ -10,6 +10,13 @@ describe('moves tutorial',()=>{
     for(const table of [MOVES,CUES]){expect(table.split_lu.label).toBe('LEFT UP');expect(table.split_ld.label).toBe('RIGHT UP');expect(table.split_ld.id).toBe('split_ld');}
     expect(MENU_LABELS.split_ld).toBe('RIGHT UP');expect(MOVES.split_lu.cue).toBe('Left forearm up, right forearm down');expect(MOVES.split_ld.cue).toBe('Right forearm up, left forearm down');
   });
+  it('Back cancels practice, separately from the Ready confirmation',()=>{
+    const nodes=new Map(['tutorialMoves','tutorialName','tutorialInstruction','tutorialIcon','tutorialProgress','tutorialPrev','tutorialNext','tutorialDone','tutorialBack'].map(id=>[id,node()]));
+    vi.stubGlobal('document',{getElementById:id=>nodes.get(id),createElement:node});
+    const onDone=vi.fn(),onBack=vi.fn(),tutorial=createTutorial({stage:{},onDone,onBack});tutorial.start(0);
+    tutorial.move('back',0);expect(onBack).toHaveBeenCalledOnce();expect(onDone).not.toHaveBeenCalled();
+    tutorial.move('choose',0);expect(onDone).toHaveBeenCalledOnce();
+  });
   it('judges either player’s live sweep independently when they begin at different times',()=>{
     const nodes=new Map(['tutorialMoves','tutorialName','tutorialInstruction','tutorialIcon','tutorialProgress','tutorialPrev','tutorialNext','tutorialDone'].map(id=>[id,node()]));
     vi.stubGlobal('document',{getElementById:id=>nodes.get(id),createElement:node});

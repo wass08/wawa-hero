@@ -1,3 +1,5 @@
+import {hydrateButtons,setButtonContent} from './hud/button.js';
+import {createJumboLab} from './hud/jumbo-lab.js';
 import {loadGameFonts} from './typography.js';
 import {createReviewBot} from './review/bot.js';
 import './styles/review.css';
@@ -7,7 +9,7 @@ import {createSeekState,clampTime,reviewRate} from './review/logic.js';
 import './styles/hud.css';
 import './styles/results.css';
 import { createStage } from './engine/stage.js';
-import { MOVES,MOVE_IDS,iconSVG } from './moves.js';
+import { MOVES,MOVE_IDS } from './moves.js';
 import { createPoseTracker,createCalorieMeter,createJudge,MOVE_KEYS } from './pose/index.js';
 import { createGameInput } from './input.js';
 import { createResourceSlot } from './lifecycle.js';
@@ -18,7 +20,7 @@ import { createResultsCheer } from './results-cheer.js';
 import { createTopHeroes } from './hud/top-heroes.js';
 import { createMenuDebug } from './hud/menu-debug.js';
 import { createShotScheduler } from './engine/shots.js';
-import { MENU_MOVES,menuActionForMove,menuMoveForKey,titleChoice,createBackHold,createMenuActivation } from './menu-controls.js';
+import { MENU_MOVES,menuActionForMove,menuMoveForKey,titleChoice,createMenuActivation } from './menu-controls.js';
 import { createCamera } from './camera.js';
 import { loadCatalog,loadChart,siteURL } from './charts.js';
 import { settings,saveSettings,saveBest } from './settings.js';
@@ -38,7 +40,8 @@ const params=new URLSearchParams(location.search),review=params.has('review'),au
 const fontsReady=loadGameFonts();
 const songs=await loadCatalog();
 await fontsReady;
-if(review&&!params.get('song')){createReviewIndex(songs,params);window.wh={state:'review-index'};}else{
+hydrateButtons();
+if(params.has('jumbolab')){window.wh=await createJumboLab(params);}else if(review&&!params.get('song')){createReviewIndex(songs,params);window.wh={state:'review-index'};}else{
 // Review is a local tool: it never contacts the scoreboard or offers saving.
 const board=await createBoardClient(review?new URLSearchParams('offline'):params);
 const CAMS={title:{pos:[0,2,10.2],look:[0,4.9,-6]},songs:{pos:[0,2.3,13.5],look:[0,5.4,-6]},play:{pos:[0,1.5,11.5],look:[0,3.3,-4]},tutorial:{pos:[0,2.3,10.5],look:[0,3.7,-4]}};
@@ -46,7 +49,7 @@ let state='title',sel=Math.max(0,songs.findIndex(s=>s.id===params.get('song'))),
 let activePage=true,cameraWanted=false,recoverToSongs=false,audioReady=false,poseStatus='',keyboardBypass=false;
 let chart=null,notes=[],maxScore=1,countAt=0,pendingStart=false,loading=false,runToken=0,duration=0,playedFor=0;
 const trackerSlot=createResourceSlot(),score=emptyScore(),synthetic=createGameInput({player:0}),heldKeys=new Set(),pressedMoves=new Map();
-const players=[0,1].map(i=>({index:i,score:i?emptyScore():score,input:i?createGameInput({player:1}):synthetic,held:i?new Set():heldKeys,judge:createJudge(),calories:createCalorieMeter({weightKg:70}),notes:[],resolved:new Set(),frame:null,releasePending:false,menu:createMenuActivation(),backHold:createBackHold(),botCursor:0,botMove:null,botNote:null,botReleaseAt:0}));
+const players=[0,1].map(i=>({index:i,score:i?emptyScore():score,input:i?createGameInput({player:1}):synthetic,held:i?new Set():heldKeys,judge:createJudge(),calories:createCalorieMeter({weightKg:70}),notes:[],resolved:new Set(),frame:null,releasePending:false,menu:createMenuActivation(),botCursor:0,botMove:null,botNote:null,botReleaseAt:0}));
 const cameraFrames=[null,null],frames=[null,null],skeletons=[null,null];
 const menuDebug=params.has('menudebug')?createMenuDebug():null;
 let lastTrack='',tutorialReturn='songs',heroShots=[],trackerSwitch=0;
@@ -55,18 +58,18 @@ let reviewHUD=null,reviewLoop=null,reviewResumeToken=0,reviewWantsPlaying=false;
 const audio=(review?createReviewAudio:createAudioPlayer)({muted:params.has('mute'),musicVolume:.8,sfxVolume:.7}),sfx=createSfx(audio);
 const cheer=review?null:createResultsCheer(audio,siteURL('sfx/stadium-cheer.mp3'));void cheer?.preload();
 const previews=createSongPreview(audio);
-function cameraPrompt(status){const show=!review&&['requesting','blocked','unavailable'].includes(status)&&state!=='results';$('cameraPrompt').hidden=!show;$('cameraRetry').disabled=status==='requesting';$('cameraRetry').textContent=status==='requesting'?'Requesting camera…':'Try camera again';$('cameraMessage').textContent=status==='blocked'?'Allow camera access in your browser, then try again.':status==='unavailable'?'Connect a camera, then try again.':'Choose Allow in your browser to see yourself on stage.';}
+function cameraPrompt(status){const show=!review&&['requesting','blocked','unavailable'].includes(status)&&state!=='results';$('cameraPrompt').hidden=!show;$('cameraRetry').disabled=status==='requesting';setButtonContent($('cameraRetry'),status==='requesting'?'Requesting camera…':'Try camera again');$('cameraMessage').textContent=status==='blocked'?'Allow camera access in your browser, then try again.':status==='unavailable'?'Connect a camera, then try again.':'Choose Allow in your browser to see yourself on stage.';}
 let shots=createShotScheduler({}, {pinned:params.get('shot')}),currentShot='front',currentShotX=0;
 const camera=createCamera({
   onStatus:cameraPrompt,
   async onLive(video){if(!activePage)return;stage.setVideo();syncWall();try{await trackerSlot.acquire(onStatus=>createPoseTracker({video,model:'lite',maxPlayers:playerCount,onStatus}),(s,detail)=>{poseStatus=s;if(s==='error')console.warn('Pose tracker:',detail);});switchTracker();}catch(e){if(activePage){poseStatus='error';console.warn('Pose tracker unavailable:',e);}}},
 });
 const gameplay=createGameplayHUD();
-const menu=createMenuHUD(songs,i=>{if(state!=='songs')return;audio.unlock().then(()=>previews.refresh());if(sel===i){menuMove('clap');}else{sel=i;sfx.play('tick');render();}});
+const menu=createMenuHUD(songs,i=>{if(state!=='songs')return;audio.unlock().then(()=>previews.refresh());if(sel===i){menuMove('clap');}else{sel=i;sfx.play('tick');render();}},move=>{audio.unlock().then(()=>menuMove(move));});
 const stage=createStage({container:$('stage'),video:camera.video,camera:{pos:CAMS.title.pos,target:CAMS.title.look,fov:58},avatar:{x:0,z:.6,scale:1.45},wall:'cam',jumbotron:true,wallBox:{w:21,h:7.8,y:4.2,z:-6.2},crowd:true,crowdClearX:2.4,beams:.5,menu:true,drawWall:createWallPainter(()=>({state,song:songs[sel],countAt,menuCamera:camera.status==='live'&&['title','songs'].includes(state)})),onFrame:tick});
 const home=createHomeHUD(board),resultHUD=createResultsHUD(board,{onContinue:()=>{sfx.play('confirm');go('songs');}});
 const topHeroes=createTopHeroes(board,$('topHeroes'));
-const tutorial=createTutorial({stage,onDone(){settings.tutorialSeen=true;saveSettings();if(tutorialReturn==='prepare'){go('songs');prepareGame();}else go(tutorialReturn);}});
+const tutorial=createTutorial({stage,onBack:leaveTutorial,onDone(){settings.tutorialSeen=true;saveSettings();if(tutorialReturn==='prepare'){go('songs');prepareGame();}else go(tutorialReturn);}});
 const photoHUD=createPhotoHUD();
 const heroes=createHeroCollector({capture:()=>stage.captureJumbotron?.(),bpm:songs[sel].bpm,onCapture(shot){if(shot.photo){photoHUD.show(shot);return;}photoHUD.flash();const toast=$('heroToast');if(toast){toast.classList.remove('taken');void toast.offsetWidth;toast.classList.add('taken');}}});
 async function switchTracker(){const tracker=trackerSlot.current;if(!tracker||tracker.closed||tracker.maxPlayers===playerCount)return;const token=++trackerSwitch;poseStatus='switching';$('bodyStatus').textContent='Switching tracker…';try{await setTrackerPlayers(tracker,playerCount);if(token===trackerSwitch&&tracker===trackerSlot.current){poseStatus='ready';lastTrack='';}}catch(e){if(token===trackerSwitch)poseStatus='error';console.warn('Tracker switch:',e);}}
@@ -82,23 +85,24 @@ function render(){
 }
 
 function setMode(count){playerCount=modeCount(count);if(playerCount===1){players[1].input.reset();players[1].held.clear();frames[1]=skeletons[1]=null;for(const [code,key] of pressedMoves)if(key.index===1)pressedMoves.delete(code);}settings.players=playerCount;saveSettings();stage.setPlayers?.(playerCount);switchTracker();audio.unlock().then(()=>sfx.play('tick'));render();}
+function leaveTutorial(){sfx.play('back');go(tutorialReturn==='prepare'?'songs':tutorialReturn);}
 function openTutorial(back='songs'){tutorialReturn=back;go('tutorial');tutorial.start(performance.now());}
 function go(next,snap=false){
   if(next!=='results')cheer?.leave();
-  for(const p of players){p.backHold.suspend();p.menu.suspend();}$('backFill').style.strokeDasharray='0 100';
+  for(const p of players)p.menu.suspend();
   if(next!=='play')pendingStart=false;
-  if(['songs','title','tutorial'].includes(next)){runToken++;loading=false;audio.stop();$('playBtn').disabled=false;$('playBtn').textContent='Choose this song';$('startGate').hidden=true;}
+  if(['songs','title','tutorial'].includes(next)){runToken++;loading=false;audio.stop();$('playBtn').disabled=false;setButtonContent($('playBtn'),'Choose this song');$('startGate').hidden=true;}
   if(!['play','pause'].includes(next)){photoCues?.suspend();stage.setPhotoCue?.(null);photoHUD.reset();}
   if(next!=='results')resultHUD.hide?.();
   state=next;if(review)stage.setPaused?.(state==='pause');const cam=CAMS[next==='title'?'title':next==='tutorial'?'tutorial':['songs','results'].includes(next)?'songs':'play'];
   stage.setFov(['play','pause','count'].includes(next)?58:54);stage.setCamera(cam.pos,cam.look,snap);stage.setWall(['title','play','pause','tutorial'].includes(next)?'cam':'canvas');stage.setMenu(['title','songs','results'].includes(next));render();
 }
 async function prepareGame(deep=false){
-  if(loading)return;loading=true;const token=++runToken,silence=previews.stop();$('playBtn').disabled=true;$('playBtn').textContent='Loading song…';
+  if(loading)return;loading=true;const token=++runToken,silence=previews.stop();$('playBtn').disabled=true;setButtonContent($('playBtn'),'Loading song…');
   const song=songs[sel],chartPromise=loadChart(song);let ready=true;
   try{await audio.load(siteURL(song.audio));}catch(e){ready=false;console.warn(e);}
   const loaded=await chartPromise;await silence;if(token!==runToken)return;
-  audioReady=ready;loading=false;$('playBtn').disabled=false;$('playBtn').textContent='Choose this song';chart=loaded;duration=audio.duration||song.duration;
+  audioReady=ready;loading=false;$('playBtn').disabled=false;setButtonContent($('playBtn'),'Choose this song');chart=loaded;duration=audio.duration||song.duration;
   // The two judges mutate distinct notes; the rail gets its own shared visual track.
   notes=chart.notes;for(const n of notes){delete n.uiResult;delete n.uiProgress;delete n.photoTaken;}
   for(const p of players){p.notes=cloneNotes(notes);p.resolved=new Set();p.judge=createJudge();p.calories=createCalorieMeter({weightKg:70});Object.assign(p.score,emptyScore());p.botCursor=0;p.botMove=p.botNote=p.photoPose=null;p.releasePending=false;p.input.reset();p.held.clear();for(const n of p.notes)n.botOffset=review?0:(Math.random()-.5)*.075;}
@@ -112,7 +116,7 @@ async function prepareGame(deep=false){
     audio.setRate(reviewRate(params.get('rate')));go('pause',true);reviewSeek(Number(params.get('t'))||0);return;
   }
   if(autoplay){if(audio.suspended||!audioReady)startPlaying(true,deep);else if(deep)startPlaying(false,true);else beginCount();}
-  else if(audio.suspended||!audioReady){go('play',deep);pendingStart=true;$('startGate').hidden=false;$('startBtn').textContent=audioReady?'Start song':'Start with silent audio';}
+  else if(audio.suspended||!audioReady){go('play',deep);pendingStart=true;$('startGate').hidden=false;setButtonContent($('startBtn'),audioReady?'Start song':'Start with silent audio');}
   else if(deep)startPlaying(false,true);else beginCount();
 }
 function beginCount(){go('count');countAt=performance.now();sfx.countdown();}
@@ -138,7 +142,7 @@ function results(demo=false){
 function menuMove(move,bypass=false){
   const action=menuActionForMove(move);if(!action)return;if(state==='results')resultHUD.activity();menu.flash(move);
   if(pendingStart&&action==='choose'){unlockAndStart();return;}
-  if(state==='tutorial'){tutorial.move(action,performance.now());return;}
+  if(state==='tutorial'){if(action==='back')leaveTutorial();else tutorial.move(action,performance.now());return;}
   if(state==='title'){
     const choice=titleChoice(move,playerCount);if(choice!==playerCount)setMode(choice);
     if(action==='choose'&&(keyboardBypass||bypass||players.some(p=>p.frame?.upperBody))){audio.unlock().then(()=>{sfx.play('confirm');previews.refresh();});settings.tutorialSeen?go('songs'):openTutorial('songs');}
@@ -147,9 +151,9 @@ function menuMove(move,bypass=false){
     if(loading)return;
     if(action==='choose'){sfx.play('confirm');settings.tutorialSeen?prepareGame():openTutorial('prepare');return;}
     sel=(sel+(action==='previous'?-1:1)+songs.length)%songs.length;sfx.play('tick');render();
-  }else if(state==='count'&&(action==='previous'||action==='back')){sfx.cancel();sfx.play('back');go('songs');}
-  else if(state==='results'&&action==='choose')resultHUD.primary();
-  else if(state==='pause'&&action==='choose')resume();
+  }else if(state==='count'&&action==='back'){sfx.cancel();sfx.play('back');go('songs');}
+  else if(state==='results'){if(action==='choose')resultHUD.primary();if(action==='back')resultHUD.leave();}
+  else if(state==='pause'){if(action==='choose')resume();if(action==='back')go('songs');}
 }
 function applyJudgement(j,index=0){
   const p=players[index],n=j.note;if(!n||n.move==='photo'||p.resolved.has(n))return;
@@ -204,19 +208,7 @@ function tick(st,dt,now){
   stage.setSkeleton(playerCount===2?(skeletons[0]||skeletons[1]?skeletons:null):skeletons[0]);
   const bodyLabel=poseStatus==='switching'?'Switching tracker…':upper?(playerCount===2?'Players in frame · clap to start':'Body in frame · clap to start'):poseStatus==='loading'?'Finding your arms…':'Step back · keep shoulders and elbows in frame';
   if(bodyLabel!==lastTrack){lastTrack=bodyLabel;$('bodyStatus').textContent=bodyLabel;}
-  const backEnabled=['songs','results'].includes(state)&&!formFocused();let backProgress=0,backTriggered=false;
-  for(let i=0;i<playerCount;i++){
-    const p=players[i];
-    // Only confirmed LEFT UP owns a Back hold. Brief score dips/dropouts pause
-    // it without re-arming; only the global rest unlock resets the consumed hold.
-    if(!p.menu.locked||p.menu.active!=='split_lu')p.backHold.reset();
-    else if(!backEnabled)p.backHold.suspend();
-    else if(!p.menu.backHeld)p.backHold.pause();
-    else if(p.menu.fresh){if(!p.menu.continuous)p.backHold.pause();const back=p.backHold.update(true,p.menu.time);if(back.trigger){backTriggered=true;p.menu.consume('split_lu',p.menu.time);}}
-    backProgress=Math.max(backProgress,p.backHold.progress);
-  }
   menuDebug?.update(players,playerCount,now);
-  if(backEnabled){if(state==='results')resultHUD.setBackProgress(backProgress);else $('backFill').style.strokeDasharray=`${backProgress*100} 100`;if(backTriggered){if(state==='results')resultHUD.leave();else menuMove('back');}}
   if(state==='tutorial')tutorial.tick(frames,now,playerCount);if(state==='title'&&!review)home.tick(now);if(state==='results')resultHUD.tick();
   if(state==='count'&&now-countAt>3300)startPlaying(autoplay&&audio.suspended);
   if((state==='play'&&!pendingStart)||state==='pause'){const count=photoCues?.update(time,state==='play')??null;stage.setPhotoCue?.(count);}
@@ -229,7 +221,7 @@ function tick(st,dt,now){
     if(state==='play'&&!pendingStart&&audio.playbackTime()>=duration)results();
   }
 }
-$('onePlayerIcon').innerHTML=iconSVG('split_lu');$('twoPlayersIcon').innerHTML=iconSVG('split_ld');$('titleClapIcon').innerHTML=iconSVG('clap');
+
 $('onePlayer').addEventListener('click',()=>setMode(1));$('twoPlayers').addEventListener('click',()=>setMode(2));
 $('titleStart').addEventListener('click',()=>menuMove('clap',true));
 $('playBtn').addEventListener('click',async()=>{await audio.unlock();if(state==='songs')menuMove('clap');});

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>WAWA HERO · Open Graph image</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: oklch(0.16 0.07 285); --fg: oklch(0.97 0.01 280); --muted: oklch(0.80 0.05 285);
+  --clap: oklch(0.70 0.25 345); --up: oklch(0.84 0.14 205); --down: oklch(0.86 0.17 88);
+  --font: 'Chakra Petch', system-ui, sans-serif;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; background: var(--bg); font-family: var(--font); color: var(--fg); -webkit-font-smoothing: antialiased; }
+.og { position: relative; width: 1200px; height: 630px; overflow: hidden; background: url(art.jpg) center / 1200px 630px no-repeat; }
+
+/* wordmark: Chakra Petch 700 uppercase, white fill, dark stroke, magenta glow (matches the old .brand h1 treatment) */
+.wordmark { margin: 0; font: 700 1em/0.95 var(--font); text-transform: uppercase; letter-spacing: .03em; color: var(--fg); white-space: nowrap;
+  -webkit-text-stroke: 0.075em var(--bg); paint-order: stroke fill;
+  text-shadow: 0 0 .22em color-mix(in oklch, var(--clap) 80%, transparent), 0 0 .6em color-mix(in oklch, var(--clap) 55%, transparent), 0 .04em 0 var(--bg); }
+.tagline { margin: 0; font: 600 1em/1.15 var(--font); color: var(--fg); letter-spacing: .01em; white-space: nowrap;
+  -webkit-text-stroke: 0.09em var(--bg); paint-order: stroke fill; text-shadow: 0 .06em 0 var(--bg), 0 0 .5em color-mix(in oklch, var(--bg) 80%, transparent); }
+.chip { display: inline-flex; align-items: center; gap: 8px; height: 34px; padding: 0 13px; font: 600 16px var(--font); letter-spacing: .06em; text-transform: uppercase; color: var(--fg);
+  background: color-mix(in oklch, var(--bg) 82%, transparent); box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--fg) 35%, transparent);
+  clip-path: polygon(4px 0, calc(100% - 4px) 0, calc(100% - 4px) 4px, 100% 4px, 100% calc(100% - 4px), calc(100% - 4px) calc(100% - 4px), calc(100% - 4px) 100%, 4px 100%, 4px calc(100% - 4px), 0 calc(100% - 4px), 0 4px, 4px 4px); }
+.chip i { width: 9px; height: 9px; background: var(--up); box-shadow: 0 0 8px var(--up); }
+.chip.url { text-transform: none; letter-spacing: .02em; color: var(--up); }
+
+/* ---- layout A: bottom band over the dance floor ---- */
+.a .band { position: absolute; left: 0; right: 0; bottom: 0; height: 330px;
+  background: linear-gradient(180deg, transparent 0%, color-mix(in oklch, var(--bg) 55%, transparent) 38%, color-mix(in oklch, var(--bg) 88%, transparent) 72%, color-mix(in oklch, var(--bg) 96%, transparent) 100%); }
+.a .copy { position: absolute; left: 0; right: 0; bottom: 40px; display: grid; justify-items: center; gap: 10px; text-align: center; }
+.a .wordmark { font-size: 102px; }
+.a .tagline { font-size: 30px; }
+.a .chips { display: flex; gap: 10px; margin-top: 6px; }
+
+/* ---- layout B: top band, title over the mirror ball ---- */
+.b .band { position: absolute; left: 0; right: 0; top: 0; height: 300px;
+  background: linear-gradient(0deg, transparent 0%, color-mix(in oklch, var(--bg) 60%, transparent) 45%, color-mix(in oklch, var(--bg) 92%, transparent) 100%); }
+.b .copy { position: absolute; left: 0; right: 0; top: 34px; display: grid; justify-items: center; gap: 10px; text-align: center; }
+.b .wordmark { font-size: 124px; }
+.b .tagline { font-size: 33px; }
+.b .chips { position: fixed; left: 0; right: 0; bottom: 26px; display: flex; justify-content: center; gap: 10px; }
+
+/* safe-area guides, ?guides=1 */
+.guides { position: absolute; inset: 0; pointer-events: none; display: none; }
+.guides.on { display: block; }
+.guides .sq { position: absolute; top: 0; bottom: 0; left: 285px; width: 630px; box-shadow: 0 0 0 2px oklch(0.9 0.2 135 / .8); }
+.guides .two { position: absolute; left: 0; right: 0; top: 15px; height: 600px; box-shadow: 0 0 0 2px oklch(0.86 0.17 88 / .8); }
+.guides .pct { position: absolute; left: 60px; top: 32px; width: 1080px; height: 566px; box-shadow: 0 0 0 2px oklch(0.84 0.14 205 / .8); }
+</style>
+</head>
+<body>
+<div class="og a" id="og">
+  <div class="band"></div>
+  <div class="copy">
+    <h1 class="wordmark">Wawa Hero</h1>
+    <p class="tagline">The rhythm game you play with your arms</p>
+    <div class="chips"><span class="chip"><i></i>Webcam dance game · 1–2 players · free</span><span class="chip url">hero.wawasensei.dev</span></div>
+  </div>
+  <div class="guides" id="guides"><div class="sq"></div><div class="two"></div><div class="pct"></div></div>
+</div>
+<script>
+const q = new URLSearchParams(location.search);
+document.getElementById('og').className = 'og ' + (q.get('layout') || 'a');
+if (q.get('guides')) document.getElementById('guides').classList.add('on');
+</script>
+</body>
+</html>

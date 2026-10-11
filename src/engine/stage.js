@@ -1,3 +1,4 @@
+import {JUMBO_LOOK,JUMBO_FRAGMENT,jumboUniforms,applyJumboLook,readJumboLook} from './jumbo-look.js';
 import {GAME_FONT} from '../typography.js';
 // Shared engine for the gameplay HUD directions: voxel stage, mirrored avatar,
 // stage-only port; the app owns song time, input, judging and HUD.
@@ -272,6 +273,7 @@ export function createStage(opts) {
     const vtex = new THREE.VideoTexture(video);
     const flash = new THREE.Color(0, 0, 0);
     const uniforms = {
+      ...jumboUniforms(),
       menuLayer:{value:wallTex},menuMix:{value:0},
       feed: { value: rt.texture }, gammaIn: { value: 1 / 2.2 }, flip: { value: 0 }, srcAspect: { value: 16 / 9 },
       wallAspect: { value: wb.w / wb.h }, time: { value: 0 }, pulse: { value: 0 }, flash: { value: flash },
@@ -282,46 +284,7 @@ export function createStage(opts) {
     const material = new THREE.ShaderMaterial({
       uniforms, fog: false,
       vertexShader: 'varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: `
-        varying vec2 vUv;
-        uniform sampler2D feed, menuLayer;
-        uniform float menuMix;
-        uniform float gammaIn, flip, srcAspect, wallAspect, time, pulse;
-        uniform vec3 flash, r0, r1, r2, r3, r4, cUp, cDown, cClap;
-        vec3 tone(float l) {            // 5-step posterise onto the stage palette
-          float i = clamp(floor(l * 5.0), 0.0, 4.0);
-          return i < 0.5 ? r0 : i < 1.5 ? r1 : i < 2.5 ? r2 : i < 3.5 ? r3 : r4;
-        }
-        void main() {
-          float feedW = (16.0 / 9.0) / wallAspect, dx = vUv.x - 0.5;
-          vec3 c;
-          if (abs(dx) < feedW * 0.5) {
-            vec2 g = vec2(60.0 * 16.0 / 9.0, 60.0);
-            vec2 fuv = vec2((vUv.x - (0.5 - feedW * 0.5)) / feedW, vUv.y);
-            vec2 cell = floor(fuv * g), f = fract(fuv * g), s = (cell + 0.5) / g;
-            if (flip > 0.5) s.x = 1.0 - s.x;
-            float k = (16.0 / 9.0) / srcAspect;
-            if (k < 1.0) s.x = 0.5 + (s.x - 0.5) * k; else s.y = 0.5 + (s.y - 0.5) / k;
-            vec3 sampleColor=texture2D(feed,s).rgb;
-            if(menuMix>.5){vec2 blur=vec2(.012,.012);sampleColor=(sampleColor*2.0+texture2D(feed,s+blur).rgb+texture2D(feed,s-blur).rgb+texture2D(feed,s+vec2(blur.x,-blur.y)).rgb+texture2D(feed,s+vec2(-blur.x,blur.y)).rgb)/6.0;}
-            float l = pow(dot(sampleColor, vec3(0.299, 0.587, 0.114)), gammaIn);
-            l = clamp((l - 0.06) * 1.3, 0.0, 1.0);
-            c = tone(l) + flash * smoothstep(0.35, 0.9, l) * 0.6;
-            float band = 1.0 - smoothstep(0.0, 0.04, abs(fuv.y - fract(1.0 - time * 0.16)));
-            c *= (1.0 + band * 0.25) * (0.16 + 0.84 * smoothstep(0.5, 0.3, length(f - 0.5)));
-          } else {
-            vec2 g = vec2(16.0 * wallAspect, 16.0);
-            vec2 cell = floor(vUv * g), f = fract(vUv * g);
-            float lv = 0.18 + 0.5 * abs(sin(time * 1.3 + cell.x * 0.55)) * (0.55 + 0.45 * sin(time * 0.7 + cell.x * 0.21)) + pulse * 0.25;
-            float t = (cell.y + 0.5) / g.y;
-            vec3 on = t < 0.45 ? cUp : t < 0.75 ? cDown : cClap;
-            c = (t < lv ? on * 0.42 : r0 * 0.4) * smoothstep(0.62, 0.42, max(abs(f.x - 0.5), abs(f.y - 0.5)));
-            if (abs(dx) < feedW * 0.5 + 0.006) c = r3 * 0.7;
-          }
-          c*=0.82+pulse*0.18;
-          if(menuMix>.5){c=mix(c,r1*dot(c,vec3(.299,.587,.114))*2.0,.2)*.32;vec4 ink=texture2D(menuLayer,vUv);c=mix(c,ink.rgb,ink.a);}
-          gl_FragColor = vec4(c, 1.0);
-        }`,
+      fragmentShader: JUMBO_FRAGMENT,
     });
     const api = {
       material, status: 'avatar', tick: false,
@@ -401,19 +364,36 @@ export function createStage(opts) {
     photoTex.needsUpdate=true;
   }
 
-  const heroRT=new THREE.WebGLRenderTarget(640,360),heroScene=new THREE.Scene(),heroCamera=new THREE.OrthographicCamera(-1,1,1,-1,0,2);
+  const heroRT=new THREE.WebGLRenderTarget(1280,720),heroScene=new THREE.Scene(),heroCamera=new THREE.OrthographicCamera(-1,1,1,-1,0,2);
   heroCamera.position.z=1;
   const heroGeo=new THREE.PlaneGeometry(2,2),heroUV=heroGeo.attributes.uv,feedW=(16/9)/(wb.w/wb.h);
   for(let i=0;i<heroUV.count;i++)heroUV.setX(i,.5+(heroUV.getX(i)-.5)*feedW);
   heroScene.add(new THREE.Mesh(heroGeo,jumbo.material));
-  const heroPixels=new Uint8Array(640*360*4),heroCanvas=document.createElement('canvas');heroCanvas.width=640;heroCanvas.height=360;
-  const heroCtx=heroCanvas.getContext('2d'),heroImage=heroCtx.createImageData(640,360);
-  function captureJumbotron() {
-    const previous=renderer.getRenderTarget();renderer.setRenderTarget(heroRT);renderer.render(heroScene,heroCamera);
-    renderer.readRenderTargetPixels(heroRT,0,0,640,360,heroPixels);renderer.setRenderTarget(previous);
-    for(let y=0;y<360;y++)heroImage.data.set(heroPixels.subarray((359-y)*640*4,(360-y)*640*4),y*640*4);
+  const heroPixels=new Uint8Array(1280*720*4),heroCanvas=document.createElement('canvas');heroCanvas.width=1280;heroCanvas.height=720;
+  const heroCtx=heroCanvas.getContext('2d'),heroImage=heroCtx.createImageData(1280,720);
+  let jumboPanels=null;
+  function captureJumbotron({look=JUMBO_LOOK.photo,width=640,height=360,type='image/webp'}={}) {
+    const previous=renderer.getRenderTarget(),uniforms=jumbo.material.uniforms,old=readJumboLook(uniforms),mix=uniforms.menuMix.value;
+    applyJumboLook(uniforms,look);uniforms.menuMix.value=0;
+    renderer.setRenderTarget(heroRT);renderer.render(heroScene,heroCamera);
+    renderer.readRenderTargetPixels(heroRT,0,0,1280,720,heroPixels);renderer.setRenderTarget(previous);
+    applyJumboLook(uniforms,old);uniforms.menuMix.value=mix;
+    for(let y=0;y<720;y++)heroImage.data.set(heroPixels.subarray((719-y)*1280*4,(720-y)*1280*4),y*1280*4);
     heroCtx.putImageData(heroImage,0,0);
-    return new Promise(resolve=>heroCanvas.toBlob(resolve,'image/webp',.8));
+    // A separate canvas snapshots these pixels before asynchronous encoding;
+    // consecutive captures cannot overwrite an earlier pending photo.
+    const output=document.createElement('canvas');output.width=width;output.height=height;
+    output.getContext('2d').drawImage(heroCanvas,0,0,width,height);
+    return new Promise(resolve=>output.toBlob(resolve,type,.88));
+  }
+  function renderJumboPanels() {
+    const uniforms=jumbo.material.uniforms,old=readJumboLook(uniforms),mix=uniforms.menuMix.value;
+    uniforms.menuMix.value=0;renderer.setScissorTest(false);renderer.setViewport(0,0,host.clientWidth,host.clientHeight);renderer.clear();renderer.setScissorTest(true);
+    for(const panel of jumboPanels()){
+      const r=panel.element.getBoundingClientRect(),y=host.clientHeight-r.bottom;
+      renderer.setViewport(r.left,y,r.width,r.height);renderer.setScissor(r.left,y,r.width,r.height);applyJumboLook(uniforms,panel.look);renderer.render(heroScene,heroCamera);
+    }
+    renderer.setScissorTest(false);renderer.setViewport(0,0,host.clientWidth,host.clientHeight);applyJumboLook(uniforms,old);uniforms.menuMix.value=mix;
   }
 
   /* ─── resize ─── */
@@ -445,6 +425,7 @@ export function createStage(opts) {
     const dt = simulationPaused ? 0 : Math.min(0.1, (now - last) / 1000); last = now; clock += dt;
     st.beat = st.songTime / beatLen; st.beatPhase = ((st.beat % 1) + 1) % 1;
     o.onFrame(st, dt, now);
+    if(jumboPanels&&jumbo.status==='live'){jumbo.update(dt);renderJumboPanels();return;}
     if (o.menu && !liveArms) {
       const b = Math.floor(clock / beatLen);
       if (b !== danceBeat && b % 2 === 0) { danceBeat = b; setPose(['up', 'down', 'split_lu', 'clap'][(b / 2) % 4 | 0], 0.9); }
@@ -509,7 +490,7 @@ export function createStage(opts) {
     camera.position.set(camPos.x + (showCamera ? 0 : Math.sin(clock * 0.35) * 0.18), camPos.y + (showCamera ? 0 : Math.sin(clock * 0.5) * 0.06), camPos.z);
     camera.lookAt(camTarget);
     drawSkeleton();
-    composer.render();
+    if(jumboPanels)renderJumboPanels();else composer.render();
   }
   requestAnimationFrame(frame);
 
@@ -517,6 +498,19 @@ export function createStage(opts) {
     setPaused(value) { simulationPaused = !!value; },
     resetEffects() { jumbo.clearHit(); },
     state: st, camera, project, captureJumbotron, setPhotoCue,
+    setJumboLook(look){applyJumboLook(jumbo.material.uniforms,look);},
+    get jumboLook(){return readJumboLook(jumbo.material.uniforms);},
+    setJumboPanels(getPanels){jumboPanels=getPanels;},
+    benchmarkJumbo(iterations=15) {
+      const target=new THREE.WebGLRenderTarget(1600,900),uniforms=jumbo.material.uniforms,old=readJumboLook(uniforms),mix=uniforms.menuMix.value,previous=renderer.getRenderTarget(),gl=renderer.getContext(),pixel=new Uint8Array(4),rows=[];
+      uniforms.menuMix.value=0;renderer.setRenderTarget(target);
+      for(const [preset,look] of Object.entries({current:JUMBO_LOOK.current,live:JUMBO_LOOK.live,photo:JUMBO_LOOK.photo})){
+        applyJumboLook(uniforms,look);renderer.render(heroScene,heroCamera);renderer.readRenderTargetPixels(target,800,450,1,1,pixel);const samples=[];
+        for(let i=0;i<iterations;i++){const start=performance.now();renderer.render(heroScene,heroCamera);renderer.readRenderTargetPixels(target,800,450,1,1,pixel);samples.push(performance.now()-start);}
+        samples.sort((a,b)=>a-b);rows.push({preset,width:1600,height:900,meanMs:samples.reduce((a,b)=>a+b,0)/samples.length,p95Ms:samples[Math.floor(samples.length*.95)]});
+      }
+      renderer.setRenderTarget(previous);applyJumboLook(uniforms,old);uniforms.menuMix.value=mix;target.dispose();return rows;
+    },
     get wallDebug() { return {mode:wallMode,menuCamera,mix:jumbo?.material.uniforms.menuMix.value||0,paints:wallLayer.paints,textureVersion:wallTex.version,visible:wall.visible}; },
     strike, hit: m => jumbo.hit(m),
     setSweepProgress(progress,player=0) {

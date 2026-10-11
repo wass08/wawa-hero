@@ -1,14 +1,14 @@
+import {moveBadge,buttonClasses} from './button.js';
 import {GAME_FONT,drawNumeralText,numeralHTML} from '../typography.js';
 import { songArtist } from '../song-meta.js';
 import { MOVES, iconSVG, drawIcon, token, P, css } from '../moves.js';
 import { getBest } from '../settings.js';
-import { MENU_LABELS } from '../menu-controls.js';
 export const $ = id => document.getElementById(id);
 export { formatTime as fmtTime } from '../time.js';
 import { formatTime as fmtTime } from '../time.js';
-const LEGENDS={songs:[['split_lu','Previous'],['split_ld','Next'],['clap','Choose']],count:[['split_lu','Cancel']],tutorial:[['split_lu','Previous'],['split_ld','Next'],['clap','Next move']]};
-export function createMenuHUD(songs,onSong) {
-  $('rows').innerHTML=songs.map((s,i)=>`<li class="row" tabindex="0" role="button" data-i="${i}"><span class="no">${String(i+1).padStart(2,'0')}</span><span><span class="t"></span><span class="m">${numeralHTML(Math.round(s.bpm))} BPM · ${numeralHTML(fmtTime(s.duration))}</span></span><span class="pips">${[1,2,3].map(n=>`<i class="${n<=s.energy?'on':''}"></i>`).join('')}</span></li>`).join('');
+const LEGENDS={songs:[['split_lu','Previous'],['split_ld','Next'],['clap','Choose']],count:[['down','Cancel']],tutorial:[['split_lu','Previous'],['split_ld','Next'],['clap','Ready']]};
+export function createMenuHUD(songs,onSong,onMove=()=>{}) {
+  $('rows').innerHTML=songs.map((s,i)=>`<li class="row ${buttonClasses('choice')}" tabindex="0" role="button" data-i="${i}"><span class="no">${String(i+1).padStart(2,'0')}</span><span><span class="t"></span><span class="m">${numeralHTML(Math.round(s.bpm))} BPM · ${numeralHTML(fmtTime(s.duration))}</span></span><span class="pips">${[1,2,3].map(n=>`<i class="${n<=s.energy?'on':''}"></i>`).join('')}</span></li>`).join('');
   const rows=[...$('rows').children];rows.forEach((r,i)=>{r.querySelector('.t').textContent=songs[i].title;r.addEventListener('click',()=>onSong(i));r.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();e.stopPropagation();if(!e.repeat)onSong(i);}});});
   return {
     render(state,sel) {
@@ -19,7 +19,7 @@ export function createMenuHUD(songs,onSong) {
       const best=getBest(s.id);$('dBest').textContent=best?best.toLocaleString():'—';
       $('dMoves').innerHTML=s.moves.map(m=>`<i style="--c:var(--${token(m)})" title="${MOVES[m].label}">${iconSVG(m)}</i>`).join('');
       $('dEnergy').innerHTML=[1,2,3].map(n=>`<i class="${n<=s.energy?'on':''}"></i>`).join('');
-      $('legend').innerHTML=(LEGENDS[state]||[]).map(([m,a])=>`<div class="key panel" data-m="${m}" style="--c:var(--${token(m)})">${iconSVG(m)}<div><b>${MENU_LABELS[m] || MOVES[m].label}</b><span>${a}</span></div></div>`).join('');
+      $('legend').innerHTML=(LEGENDS[state]||[]).map(([m,a])=>`<button type="button" class="key ${buttonClasses('secondary')}" data-m="${m}">${moveBadge(m)}<span class="button-label">${a}</span></button>`).join('');for(const button of $('legend').children)button.addEventListener('click',()=>onMove(button.dataset.m));
     },
     flash(m) { const el=$('legend').querySelector(`[data-m="${m}"]`);if(el){el.classList.add('hit');setTimeout(()=>el.classList.remove('hit'),260);} },
   };
@@ -42,7 +42,8 @@ export function createWallPainter(getState) {
       ctx.save();ctx.translate(cx,H*0.62);ctx.scale(k,k);ctx.font=`700 ${n>0?300:220}px ${FONT}`;ctx.fillStyle=n>0?css(P.fg):css(acc);if(n>0){ctx.strokeStyle=css(P.dark);ctx.lineWidth=12;ctx.strokeText(txt,0,0);}ctx.fillText(txt,0,0);ctx.restore();
       ctx.font=`700 40px ${FONT}`;ctx.fillStyle=css(P.fg,0.75);ctx.fillText(song.title.toUpperCase(),cx,H*0.8);
     } else if(state==='title') {
-      ctx.font=`700 136px ${FONT}`;ctx.fillStyle=css(P.fg);ctx.fillText('WAWA HERO',cx,H*.43);
+      ctx.font=`700 136px ${FONT}`;ctx.fillStyle=css(P.fg);ctx.fillText('WAWA HERO',cx,H*.36);
+      ctx.font=`500 36px ${FONT}`;ctx.fillStyle=css(P.fg,.85);ctx.fillText('The rhythm game you play with your arms',cx,H*.5);
       ctx.font=`600 34px ${FONT}`;ctx.fillStyle=css(acc);ctx.fillText('CLAP TO START',cx,H*.6);
     } else {
       ctx.font=`600 34px ${FONT}`;ctx.fillStyle=css(acc);ctx.fillText(state==='results'?'SET COMPLETE':'NOW SELECTED',cx,H*0.17);

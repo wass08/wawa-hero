@@ -1,3 +1,4 @@
+vi.mock('../hud/button.js',()=>({hydrateButtons:vi.fn(),setButtonContent:(el,text)=>{if(el)el.textContent=text;}}));
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const env=vi.hoisted(()=>({nodes:new Map(),events:{},storage:new Map(),now:0,elapsed:0,duration:5,suspended:false,failLoad:false,frame:null,trackerFactory:null,notes:[],cameraCues:[],tick:null,audio:null,camera:null,stage:null,results:null}));
 vi.mock('../engine/stage.js',()=>({createStage:options=>{
@@ -9,7 +10,7 @@ vi.mock('../hud/menu.js',()=>({
   createWallPainter:()=>()=>{},createMenuHUD:()=>env.menu=({render:vi.fn(),flash:vi.fn()}),
 }));
 vi.mock('../hud/gameplay.js',()=>({createGameplayHUD:()=>({setSong:vi.fn(),judgement:vi.fn(),update:vi.fn()})}));
-vi.mock('../hud/results.js',()=>({createResultsHUD:(_board,{onContinue})=>env.results={show:vi.fn(),setShots:vi.fn(),hide:vi.fn(),activity:vi.fn(),tick:vi.fn(),setBackProgress:vi.fn(),keydown:vi.fn(),primary:vi.fn(),leave:vi.fn(onContinue),movesBlocked:()=>document.activeElement?.tagName==='INPUT'&&!!document.activeElement.value}}));
+vi.mock('../hud/results.js',()=>({createResultsHUD:(_board,{onContinue})=>env.results={show:vi.fn(),setShots:vi.fn(),hide:vi.fn(),activity:vi.fn(),tick:vi.fn(),keydown:vi.fn(),primary:vi.fn(),leave:vi.fn(onContinue),movesBlocked:()=>document.activeElement?.tagName==='INPUT'&&!!document.activeElement.value}}));
 vi.mock('../preview.js',()=>({createSongPreview:()=>({select:vi.fn(),refresh:vi.fn(),stop:vi.fn(async()=>{})})}));
 vi.mock('../charts.js',()=>({siteURL:s=>s,loadCatalog:async()=>[{id:'song',title:'Song',bpm:120,duration:5,audio:'audio',moves:['up','down','clap','split_lu','split_ld','sweep']}],loadChart:async()=>({bpm:120,camera:env.cameraCues,notes:env.notes.map(n=>({...n}))})}));
 vi.mock('../audio.js',()=>({createAudioPlayer:({muted})=>{
@@ -28,7 +29,7 @@ vi.mock('../camera.js',()=>({CAMERA_COPY:{avatar:['avatar','',''],live:['live','
   };options.onStatus('avatar');return env.camera=api;
 }}));
 vi.mock('../pose/index.js',async importOriginal=>({...await importOriginal(),createPoseTracker:options=>env.trackerFactory(options)}));
-const ids=['cameraPrompt','cameraMessage','cameraRetry','bodyStatus','backBtn','backFill','onePlayer','twoPlayers','onePlayerIcon','twoPlayersIcon','titleStart','titleClapIcon','playBtn','startGate','startBtn','resultSong','resultScore','resultStars','resultCombo','resultPerfect','resultGood','resultMiss','resultKcal','resultTime','newBest','chkDist','chkBody','trackTitle','trackSub','keyboardBtn','pauseBtn','resumeBtn','quitBtn','resultsBtn','weight','calibration'];
+const ids=['cameraPrompt','cameraMessage','cameraRetry','bodyStatus','backBtn','onePlayer','twoPlayers','titleStart','playBtn','startGate','startBtn','resultSong','resultScore','resultStars','resultCombo','resultPerfect','resultGood','resultMiss','resultKcal','resultTime','newBest','chkDist','chkBody','trackTitle','trackSub','keyboardBtn','pauseBtn','resumeBtn','quitBtn','resultsBtn','weight','calibration'];
 function node() {const classes=new Set();return {textContent:'',value:0,hidden:false,dataset:{},handlers:{},style:{},setAttribute(k,v){this[k]=v;},addEventListener(type,fn){this.handlers[type]=fn;},classList:{toggle(k,on){on?classes.add(k):classes.delete(k);},contains:k=>classes.has(k)}};}
 async function settle(){for(let i=0;i<12;i++)await Promise.resolve();}
 async function boot({query='?state=play&mute&offline&demo',bests={},calibration=0}={}){
@@ -59,11 +60,10 @@ describe('game integration audit regressions',()=>{
     expect(app.sfx.counts.shutter.attempted).toBe(1);
     expect(app.photoNotes[0].photoTaken).toBe(true);
   });
-  it('returns to the title after a camera LEFT UP hold and consumes the held edge',async()=>{
+  it('returns to title after ARMS DOWN and consumes the held edge',async()=>{
     const app=await boot({query:'?state=songs&players=2&mute&offline&demo'});await env.camera.enable();
-    env.frame=pose({split_lu:1});tick(.1);expect(app.state).toBe('songs');
-    advance(.12,.82);expect(env.nodes.get('backFill').style.strokeDasharray).toBe('50 100');
-    advance(.84,1.44);expect(app.state).toBe('title');env.nodes.get('twoPlayers').handlers.click();tick(1.4);expect(app.players).toHaveLength(2);
+    env.frame=pose({down:1});advance(.1,.24);expect(app.state).toBe('title');
+    advance(.26,3);expect(app.state).toBe('title');expect(env.menu.flash.mock.calls.filter(([m])=>m==='down')).toHaveLength(1);
   });
   it('composites one live camera behind title and song text, preserving fallback and gameplay',async()=>{const app=await boot({query:'?mute&offline&demo'});expect(env.stage.setMenuCamera).toHaveBeenLastCalledWith(false);await env.camera.enable();expect(env.stage.setVideo).toHaveBeenCalledTimes(1);expect(env.stage.setMenuCamera).toHaveBeenLastCalledWith(true);expect(env.stage.setWall).toHaveBeenLastCalledWith('cam');env.nodes.get('titleStart').handlers.click();expect(app.state).toBe('tutorial');expect(env.stage.setMenuCamera).toHaveBeenLastCalledWith(false);});
   it.each(['title','songs'])('routes the %s wall to a painted canvas without a camera, and to the menu composite when live',async state=>{
@@ -74,7 +74,7 @@ describe('game integration audit regressions',()=>{
     expect(env.stage.setWall).toHaveBeenLastCalledWith('cam');
     expect(env.stage.setMenuCamera).toHaveBeenLastCalledWith(true);
   });
-  it('routes a held results LEFT UP through the shared leave action',async()=>{const app=await boot();await env.camera.enable();tick(5);env.frame=pose({split_lu:1});advance(5.1,5.82);expect(env.results.setBackProgress).toHaveBeenLastCalledWith(.5);advance(5.84,6.44);expect(env.results.leave).toHaveBeenCalledTimes(1);expect(app.state).toBe('songs');});
+  it('routes results ARMS DOWN through the shared leave action',async()=>{const app=await boot();await env.camera.enable();tick(5);env.frame=pose({down:1});advance(5.1,5.24);expect(env.results.leave).toHaveBeenCalledTimes(1);expect(app.state).toBe('songs');});
   it('uses clickable title choices and a clap button without any keyboard option',async()=>{
     const app=await boot({query:'?mute&offline&demo'});
     env.nodes.get('twoPlayers').handlers.click();expect(app.players).toHaveLength(2);
@@ -82,6 +82,16 @@ describe('game integration audit regressions',()=>{
     env.nodes.get('titleStart').handlers.click();expect(app.state).toBe('tutorial');
   });
 
+  it('ARMS DOWN leaves the first-song tutorial without starting a song',async()=>{
+    const app=await boot({query:'?state=songs&mute&offline&demo'});await env.nodes.get('playBtn').handlers.click();expect(app.state).toBe('tutorial');
+    await env.camera.enable();env.frame=pose({down:1});advance(.1,.24);expect(app.state).toBe('songs');advance(.26,2);
+    expect(app.state).toBe('songs');expect(env.audio.load).not.toHaveBeenCalled();
+  });
+  it('LEFT UP never cancels countdown; released ARMS DOWN does',async()=>{
+    env.suspended=true;const app=await boot();await env.nodes.get('startBtn').handlers.click();await env.camera.enable();
+    env.frame=pose({split_lu:1});advance(.1,.24);expect(app.state).toBe('count');env.frame.scores={};advance(.26,.7);
+    env.frame.scores={down:1};advance(.72,.86);expect(app.state).toBe('songs');
+  });
   it('keeps the lite model while switching player counts and reports the pending transition',async()=>{
     let finish;const tracker={maxPlayers:1,updateAll:()=>[null,null],setMaxPlayers:vi.fn(n=>new Promise(resolve=>{finish=()=>{tracker.maxPlayers=n;resolve();};})),close:vi.fn(),stats:{}};
     env.trackerFactory=vi.fn(async()=>tracker);const app=await boot({query:'?mute&offline&demo'});await env.camera.enable();
@@ -124,9 +134,9 @@ describe('game integration audit regressions',()=>{
     const app=await boot();await env.camera.enable();env.frame=pose({clap:1});tick(4.98);tick(5);expect(app.state).toBe('results');
     tick(5.02);expect(app.state).toBe('results');env.frame.scores.clap=0;tick(5.04);env.frame.scores.clap=1;tick(5.1);expect(app.state).toBe('results');
   });
-  it('allows camera LEFT UP to cancel countdown (#8)',async()=>{
+  it('allows camera ARMS DOWN to cancel countdown (#8)',async()=>{
     env.suspended=true;const app=await boot();await env.nodes.get('startBtn').handlers.click();expect(app.state).toBe('count');
-    await env.camera.enable();env.frame=pose({split_lu:1});advance(.1,.24);expect(app.state).toBe('songs');env.frame.scores.split_lu=0;tick(5);expect(app.state).toBe('songs');expect(env.audio.running).toBe(false);
+    await env.camera.enable();env.frame=pose({down:1});advance(.1,.24);expect(app.state).toBe('songs');env.frame.scores.down=0;tick(5);expect(app.state).toBe('songs');expect(env.audio.running).toBe(false);
   });
   it('explicitly chooses silent mode after load failure even if an old duration exists (#9)',async()=>{
     env.failLoad=true;const app=await boot();expect(env.nodes.get('startBtn').textContent).toBe('Start with silent audio');
@@ -187,11 +197,10 @@ describe('menu activation integration',()=>{
     env.frame.scores={split_ld:.8};advance(.92,2);
     expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_ld')).toHaveLength(1);expect(env.menu.flash.mock.calls.filter(([move])=>move==='clap')).toHaveLength(0);
   });
-  it('pauses a Back fill during lost tracking, and never counts the lost interval',async()=>{
-    const app=await boot({query:'?state=songs&mute&offline&demo'});await env.camera.enable();env.frame=pose({split_lu:1});advance(.1,.82);
-    expect(env.nodes.get('backFill').style.strokeDasharray).toBe('50 100');env.frame.tracked=false;advance(.84,2);
-    expect(env.nodes.get('backFill').style.strokeDasharray).toBe('50 100');expect(app.state).toBe('songs');env.frame.tracked=true;advance(2.02,2.6);expect(app.state).toBe('songs');
-    advance(2.62,2.64);expect(app.state).toBe('title');expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_lu')).toHaveLength(1);
+  it('ARMS DOWN stays consumed across a dropout and screen change',async()=>{
+    const app=await boot({query:'?state=songs&mute&offline&demo'});await env.camera.enable();env.frame=pose({down:1});advance(.1,.24);expect(app.state).toBe('title');
+    env.frame.tracked=false;advance(.26,2);env.frame.tracked=true;advance(2.02,4);
+    expect(env.menu.flash.mock.calls.filter(([m])=>m==='down')).toHaveLength(1);expect(app.state).toBe('title');
   });
 
   it('fires song next only once through five seconds of a noisy held RIGHT UP',async()=>{
@@ -201,15 +210,13 @@ describe('menu activation integration',()=>{
     env.frame.scores.split_ld=0;advance(5.1,5.6);env.frame.scores.split_ld=1;advance(5.7,5.84);
     expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_ld')).toHaveLength(2);
   });
-  it('fires previous once before the deliberate Back hold and never repeats it on title',async()=>{
-    const app=await boot({query:'?state=songs&players=2&mute&offline&demo'});await env.camera.enable();env.frame=pose({split_lu:1});
-    advance(.1,.82);expect(env.nodes.get('backFill').style.strokeDasharray).toBe('50 100');advance(.84,1.44);expect(app.state).toBe('title');
-    env.nodes.get('twoPlayers').handlers.click();for(let i=70;i<250;i++)tick(i/50);
-    expect(app.players).toHaveLength(2);expect(env.menu.flash.mock.calls.filter(([move])=>move==='split_lu')).toHaveLength(1);expect(env.menu.flash.mock.calls.filter(([move])=>move==='back')).toHaveLength(1);
+  it('LEFT UP fires previous once and never Back, even held five seconds',async()=>{
+    const app=await boot({query:'?state=songs&mute&offline&demo'});await env.camera.enable();env.frame=pose({split_lu:1});advance(.1,5);
+    expect(app.state).toBe('songs');expect(env.menu.flash.mock.calls.filter(([m])=>m==='split_lu')).toHaveLength(1);
   });
-  it('consumes a results Back hold across results → songs rather than cascading to title',async()=>{
-    const app=await boot();await env.camera.enable();tick(5);env.frame=pose({split_lu:1});advance(5.1,6.44);expect(app.state).toBe('songs');
-    for(let i=320;i<550;i++)tick(i/50);expect(env.results.leave).toHaveBeenCalledTimes(1);expect(app.state).toBe('songs');
+  it('consumes results ARMS DOWN across results → songs, never cascading to title',async()=>{
+    const app=await boot();await env.camera.enable();tick(5);env.frame=pose({down:1});advance(5.1,8);
+    expect(env.results.leave).toHaveBeenCalledTimes(1);expect(app.state).toBe('songs');
   });
   it('each player can activate the same move once without a shared cooldown',async()=>{
     await boot({query:'?state=songs&players=2&mute&offline&demo'});let second=null;env.trackerFactory=async()=>({updateAll:()=>[env.frame,second],setMaxPlayers:vi.fn(),close:vi.fn()});await env.camera.enable();

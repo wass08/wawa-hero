@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createMenuActivation, createBackHold } from '../menu-controls.js';
+import { createMenuActivation } from '../menu-controls.js';
 import { createPoseAnalyzer, bodyLandmarks, POSES } from '../pose/index.js';
 import { lerpPose } from '../pose/body.js';
 
@@ -9,11 +9,11 @@ function random(seed) {
 // 30 fps camera stream, bounded +/- .15 score jitter, 1-3 frame losses, and
 // transient (50-100 ms) confident competing shapes at each arm transition.
 function noisyCamera(seed, { raises = 1, back = false, landmarks = false } = {}) {
-  const rng = random(seed), gate = createMenuActivation(), hold = createBackHold();
+  const rng = random(seed), gate = createMenuActivation();
   const analyzer = landmarks ? createPoseAnalyzer() : null;
   const actions = [];
   let t = 0, lost = 0, duplicateFrames = 0;
-  const move = back ? 'split_lu' : seed % 2 ? 'split_lu' : 'split_ld';
+  const move = back ? 'down' : seed % 2 ? 'split_lu' : 'split_ld';
   function segment(duration, phase, from = POSES.neutral, to = from) {
     const frames = Math.round(duration * 30);
     for (let i = 0; i < frames; i++, t += 1000 / 30) {
@@ -25,7 +25,7 @@ function noisyCamera(seed, { raises = 1, back = false, landmarks = false } = {})
         const raw = dropout ? null : bodyLandmarks({ pose, noise: .004, roll: (rng() - .5) * 6, rng });
         frame = analyzer.process(raw, t, 16 / 9);
       } else {
-        const scores = { split_lu: .08 + .15 * rng(), split_ld: .08 + .15 * rng(), clap: .08 + .15 * rng() };
+        const scores = { split_lu: .08 + .15 * rng(), split_ld: .08 + .15 * rng(), clap: .08 + .15 * rng(), down: .08 + .15 * rng() };
         if (phase === 'hold') {
           // Settle confidently, then drift through the problematic .4-.7 band.
           scores[move] = (i < 45 || i % 90 < 12 ? .85 : .55) + (rng() - .5) * .3;
@@ -36,11 +36,6 @@ function noisyCamera(seed, { raises = 1, back = false, landmarks = false } = {})
       }
       const action = gate.update(frame);
       if (action) actions.push(action);
-      if (back) {
-        if (!gate.locked || gate.active !== 'split_lu') hold.reset();
-        else if (!gate.backHeld) hold.pause();
-        else if (gate.fresh && hold.update(true, gate.time).trigger) actions.push('back');
-      }
       // A 60 Hz renderer will often see the same 30 Hz camera frame twice.
       expect(gate.update(frame)).toBeNull(); duplicateFrames++;
     }
@@ -72,12 +67,12 @@ describe('realistic camera menu replay', () => {
     }
     console.info('MENU REPLAY double raise: 100/100 runs passed; 200 actions');
   });
-  it('100 noisy Back holds yield previous once then Back once', () => {
+  it('100 noisy ARMS DOWN activations yield Back once', () => {
     for (let seed = 1; seed <= 100; seed++) {
       const { actions } = noisyCamera(seed, { back: true });
-      expect(actions, `Back seed ${seed}`).toEqual(['split_lu', 'back']);
+      expect(actions, `Back seed ${seed}`).toEqual(['down']);
     }
-    console.info('MENU REPLAY Back: 100/100 runs passed; 100 previous + 100 Back');
+    console.info('MENU REPLAY Back: 100/100 runs passed; 100 ARMS DOWN; 0 repeats');
   });
   it('runs 100 landmark streams through the REAL smoothed pose analyzer', () => {
     for (let seed = 1; seed <= 100; seed++) {

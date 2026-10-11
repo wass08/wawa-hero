@@ -39,6 +39,7 @@ it.skipIf(!chrome)('paints menu walls before the first frame with and without a 
     // Exercise the real renderers, not just their shared move table.
     const {MOVES,CUES}=await import('/src/moves.js');
     const {MENU_LABELS}=await import('/src/menu-controls.js');
+    const {hydrateButtons}=await import('/src/hud/button.js');hydrateButtons();
     const {createMenuHUD}=await import('/src/hud/menu.js');
     const {createGameplayHUD}=await import('/src/hud/gameplay.js');
     const {createTutorial}=await import('/src/hud/tutorial.js');
@@ -46,13 +47,16 @@ it.skipIf(!chrome)('paints menu walls before the first frame with and without a 
     const {emptyScore}=await import('/src/game/versus.js');
     const song={id:'label-test',title:'Label test',bpm:120,duration:10,moves:['split_ld'],energy:1};
     const menu=createMenuHUD([song],()=>{});menu.render('songs',0);
+    const legendMoves={songs:[...document.querySelectorAll('#legend [data-m]')].map(b=>b.dataset.m)};
     const labels={move:MOVES.split_ld.label,cue:CUES.split_ld.label,menu:MENU_LABELS.split_ld,
-      title:document.querySelector('#twoPlayers>span:last-child').textContent,
-      legend:document.querySelector('#legend [data-m="split_ld"] b').textContent};
-    menu.render('tutorial',0);labels.tutorialLegend=document.querySelector('#legend [data-m="split_ld"] b').textContent;
+      title:document.querySelector('#twoPlayers .move-badge-name').textContent,
+      legend:document.querySelector('#legend [data-m="split_ld"] .move-badge-name').textContent};
+    menu.render('tutorial',0);legendMoves.tutorial=[...document.querySelectorAll('#legend [data-m]')].map(b=>b.dataset.m);labels.tutorialLegend=document.querySelector('#legend [data-m="split_ld"] .move-badge-name').textContent;
+    menu.render('count',0);legendMoves.count=[...document.querySelectorAll('#legend [data-m]')].map(b=>b.dataset.m);
+    const backBadges=['backBtn','tutorialBack'].map(id=>document.querySelector('#'+id+' .move-badge').dataset.move);
     const tutorial=createTutorial({stage:{},onDone(){}});tutorial.start(0);
     for(let i=0;i<4;i++)tutorial.move('next',0);
-    labels.tutorialCard=document.querySelector('#tutorialMoves .active span').textContent;
+    labels.tutorialCard=document.querySelector('#tutorialMoves .active .move-badge-name').textContent;
     labels.tutorialTitle=document.getElementById('tutorialName').textContent;
     const instruction=document.getElementById('tutorialInstruction').textContent;
     const chart={bpm:120,notes:[{t:1,move:'split_ld'}],sections:[]};
@@ -61,14 +65,19 @@ it.skipIf(!chrome)('paints menu walls before the first frame with and without a 
     const review=createReviewHUD({song,chart,duration:10,cameraCues:[],params:new URLSearchParams('mute&fakeboard'),
       getState:()=>({camera:'avatar',rate:1}),onToggle(){},onSeek(){},onRate(){},onLoop(){},onCamera(){},onSfx(){}});
     review.update(0);labels.inspector=document.querySelector('.review-note-move').textContent;
-    return {rows,frames,labels,instruction};
+    const oldLook=stage.jumboLook;stage.setMenuCamera(true);
+    const photo=await stage.captureJumbotron();const dimensions=await createImageBitmap(photo);
+    const capture={width:dimensions.width,height:dimensions.height,type:photo.type,look:stage.jumboLook,mix:stage.wallDebug.mix};dimensions.close();
+    return {rows,frames,labels,instruction,capture,oldLook,legendMoves,backBadges};
   })()`;
   const result=await new Promise((resolve,reject)=>{ws.addEventListener('message',e=>{const m=JSON.parse(e.data);if(m.id===1){if(m.error||m.result.exceptionDetails)reject(Error(JSON.stringify(m)));else resolve(m.result.result.value);}});ws.send(JSON.stringify({id:1,method:'Runtime.evaluate',params:{expression,awaitPromise:true,returnByValue:true}}));});
+  expect(result.legendMoves).toEqual({songs:['split_lu','split_ld','clap'],tutorial:['split_lu','split_ld','clap'],count:['down']});expect(result.backBadges).toEqual(['down','down']);
+  expect(result.capture).toMatchObject({width:640,height:360,type:'image/webp',mix:1});expect(result.capture.look).toEqual(result.oldLook);expect(result.oldLook).toMatchObject({tones:10,rows:100});
   for(const [surface,label] of Object.entries(result.labels))expect(label,surface).toBe('RIGHT UP');
   expect(result.instruction).toBe('Right forearm up, left forearm down');
   expect(result.frames).toBe(1);expect(result.rows).toHaveLength(4);
   for(const row of result.rows){
-    expect(row.texts).toEqual(row.state==='songs'?['NOW SELECTED','ARMS UP, ARMS DOWN','137',' BPM']:['WAWA HERO','CLAP TO START']);
+    expect(row.texts).toEqual(row.state==='songs'?['NOW SELECTED','ARMS UP, ARMS DOWN','137',' BPM']:['WAWA HERO','The rhythm game you play with your arms','CLAP TO START']);
     expect(row.bright).toBeGreaterThan(1000);expect(row.paints).toBeGreaterThan(0);expect(row.textureVersion).toBeGreaterThan(1);expect(row.visible).toBe(true);
     expect(row.mode).toBe(row.live?'cam':'canvas');expect(row.mix).toBe(row.live?1:0);
     expect(row.menuCamera).toBe(row.live);expect(row.transparent>0).toBe(row.live);

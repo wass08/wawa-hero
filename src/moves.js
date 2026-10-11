@@ -2,7 +2,7 @@ import { P } from './engine/palette.js';
 export { P, css } from './engine/palette.js';
 export const MOVES = {
   up:   { id: 'up',   lane: 0, label: 'ARMS UP',   cue: 'Elbows 90°, hands up',   key: '1', alias: '↑',     c: P.up },
-  down: { id: 'down', lane: 1, label: 'ARMS DOWN', cue: 'Elbows 90°, hands down', key: '2', alias: '↓',     c: P.down },
+  down: { id: 'down', lane: 1, label: 'ARMS DOWN', cue: 'Elbows 90°, hands down · ARMS DOWN also goes back in menus', key: '2', alias: '↓',     c: P.down },
   clap: { id: 'clap', lane: 2, label: 'CLAP',      cue: 'Clap in front of chest', key: '3', alias: 'Space', c: P.clap },
 };
 MOVES.split_lu = { id: 'split_lu', lane: 3, label: 'LEFT UP', cue: 'Left forearm up, right forearm down', key: '4', c: P.split_lu };
